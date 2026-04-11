@@ -20,6 +20,7 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
     when (viewModel.currentStep) {
         1 -> ProfileSetupScreen(viewModel)
         2 -> ActiveLobbyScreen(viewModel)
+        3 -> GameBoardScreen()
     }
 }
 
@@ -129,8 +130,21 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
         }
 
         Spacer(modifier = Modifier.weight(1f))
-        Button(onClick = { /* Startet das Spiel im Backend */ }, modifier = Modifier.fillMaxWidth()) {
+        Button(onClick = {
+            viewModel.startGame() }, modifier = Modifier.fillMaxWidth()) {
             Text("SPIEL STARTEN")
         }
+    }
+}
+@Composable
+fun GameBoardScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "GAMEBOARD",
+            style = MaterialTheme.typography.headlineLarge
+        )
     }
 }

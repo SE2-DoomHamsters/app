@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 class LobbyViewModel : ViewModel() {
-    // 1 = Profil-Setup, 2 = Aktive Lobby
+    // 1 = Profil-Setup, 2 = Aktive Lobby, 3 = Gameboard
     var currentStep by mutableStateOf(1)
     var groupName by mutableStateOf("")
     var username by mutableStateOf("")
@@ -30,5 +30,9 @@ class LobbyViewModel : ViewModel() {
             )
             currentStep = 2
         }
+    }
+    fun startGame() {
+        // Logik
+        currentStep = 3
     }
 }

@@ -16,6 +16,8 @@ class GameEngine(playerIds: ArrayList<String>) {
         val player = gameState.players.find { it.id == playerId }
             ?: throw InvalidActionException("Player $playerId not found")
 
+        if (!player.isAlive()) throw InvalidActionException("Player $playerId is dead")
+
         val card = gameState.deck.draw()
             ?: throw InvalidDrawException("Deck is empty")
 
@@ -27,10 +29,6 @@ class GameEngine(playerIds: ArrayList<String>) {
                 gameState.discard.add(card)
             } else {
                 player.lives--
-                gameState.discard.add(card)
-                if (player.lives <= 0) {
-                    gameState.players.remove(player)
-                }
             }
         } else {
             player.hand.add(card)
@@ -40,6 +38,7 @@ class GameEngine(playerIds: ArrayList<String>) {
     fun insertCard(card: Card, position: Int) {
         gameState.deck.insertAt(card, position)
     }
+
 
 
 

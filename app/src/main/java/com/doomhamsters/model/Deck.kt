@@ -3,6 +3,7 @@ package com.doomhamsters.model
 class Deck {
     // Arraylist instead of Dequeue cause you can insert easier into it.
     private val cards = ArrayList<Card>()
+    fun size(): Int = cards.size
 
     fun draw(): Card? {
         if (cards.isEmpty()) return null

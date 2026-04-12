@@ -17,4 +17,11 @@ class Deck {
         val Index = index.coerceIn(0, cards.size)
         cards.add(Index, card)
     }
+
+    fun insertFromTop(card: Card, position: Int) {
+        val actualPosition = (cards.size - position).coerceIn(0, cards.size)
+        cards.add(actualPosition, card)
+    }
+
+
 }

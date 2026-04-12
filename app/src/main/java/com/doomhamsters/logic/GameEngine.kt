@@ -40,6 +40,19 @@ class GameEngine(playerIds: ArrayList<String>) {
     }
 
 
+    fun advanceTurn() {
+        val alivePlayers = gameState.players.filter { it.isAlive() }
+        if (alivePlayers.size == 1) {
+            gameState.status = Status.Finished
+            return
+        }
+
+        var nextIndex = (gameState.currentPlayerIndex + 1) % gameState.players.size
+        while (!gameState.players[nextIndex].isAlive()) {
+            nextIndex = (nextIndex + 1) % gameState.players.size
+        }
+        gameState.currentPlayerIndex = nextIndex
+    }
 
 
 }

@@ -8,11 +8,11 @@ class GameEngine(playerIds: ArrayList<String>) {
 
     private val gameState: GameState = GameFactory.createGame(playerIds)
 
-    fun getState(): GameState = gameState
+    fun getState(): GameState = gameState.copy()
 
 
     //TODO: Restructure it so the logic of what a card does is handled by the cards, strategy pattern.
-    fun draw(playerId: String) {
+    fun draw(playerId: String): Boolean {
         val player = gameState.players.find { it.id == playerId }
             ?: throw InvalidActionException("Player $playerId not found")
 
@@ -27,11 +27,14 @@ class GameEngine(playerIds: ArrayList<String>) {
                 player.hand.remove(snackStash)
                 gameState.discard.add(snackStash)
                 gameState.discard.add(card)
+                return true
             } else {
                 player.lives--
+                return false
             }
         } else {
             player.hand.add(card)
+            return false
         }
     }
 

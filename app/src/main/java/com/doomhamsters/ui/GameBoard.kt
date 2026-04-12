@@ -9,6 +9,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.doomhamsters.viewmodel.GameBoardViewModel
+import androidx.compose.material3.TextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 @Composable
 fun GameBoard(
@@ -16,6 +23,9 @@ fun GameBoard(
     onGameOver: (String) -> Unit
 ) {
     val gameState by viewModel.gameState.collectAsState()
+    val log by viewModel.log.collectAsState()
+    val pendingDoom by viewModel.pendingDoom.collectAsState()
+    var doomPosition by remember { mutableStateOf("") }
 
     LaunchedEffect(Unit) {
         viewModel.gameOver.collect { winnerId -> onGameOver(winnerId) }
@@ -34,22 +44,40 @@ fun GameBoard(
             players = gameState?.players ?: emptyList(),
             currentPlayerIndex = gameState?.currentPlayerIndex ?: 0
         )
-        Button(onClick = {
-            currentPlayer?.let {
-                viewModel.draw(it.id)
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (pendingDoom) {
+            Text("Where to insert Doom? (0 = top)")
+            TextField(
+                value = doomPosition,
+                onValueChange = { doomPosition = it },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+            )
+            Button(onClick = {
+                val pos = doomPosition.toIntOrNull() ?: 0
+                viewModel.insertDoom(pos)
                 viewModel.advanceTurn()
+                doomPosition = ""
+            }) {
+                Text("Insert Doom")
             }
-        }) {
-            Text("Draw")
+        } else {
+            Button(onClick = {
+                currentPlayer?.let {
+                    viewModel.draw(it.id)
+                    if (!pendingDoom) viewModel.advanceTurn()
+                }
+            }) {
+                Text("Draw")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        Text("Log:")
+        Column {
+            log.takeLast(5).forEach { entry ->
+                Text("• $entry")
+            }
         }
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GameBoardPreview() {
-    val fakeViewModel = GameBoardViewModel().apply {
-        startGame(arrayListOf("Fat", "Zombie", "Sleepy"))
-    }
-    GameBoard(viewModel = fakeViewModel, onGameOver = {})
 }

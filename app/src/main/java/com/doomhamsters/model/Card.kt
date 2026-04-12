@@ -1,8 +1,9 @@
 package com.doomhamsters.model
 
 enum class CardType {
-    Hamster,
-    Defuse
+    Doom,
+    SnackStash,
+    Normal
 }
 
 data class Card(val type: CardType)

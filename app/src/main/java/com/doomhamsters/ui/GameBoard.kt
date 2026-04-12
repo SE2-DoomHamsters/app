@@ -6,16 +6,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.doomhamsters.viewmodel.GameBoardViewModel
 import androidx.compose.material3.TextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 
 @Composable
 fun GameBoard(
@@ -46,7 +41,7 @@ fun GameBoard(
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (pendingDoom) {
+        if (pendingDoom != null) {
             Text("Where to insert Doom? (0 = top)")
             TextField(
                 value = doomPosition,
@@ -65,7 +60,7 @@ fun GameBoard(
             Button(onClick = {
                 currentPlayer?.let {
                     viewModel.draw(it.id)
-                    if (!pendingDoom) viewModel.advanceTurn()
+                    if (pendingDoom == null) viewModel.advanceTurn()
                 }
             }) {
                 Text("Draw")

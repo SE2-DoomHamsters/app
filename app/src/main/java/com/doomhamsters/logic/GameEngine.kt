@@ -12,7 +12,7 @@ class GameEngine(playerIds: ArrayList<String>) {
 
 
     //TODO: Restructure it so the logic of what a card does is handled by the cards, strategy pattern.
-    fun draw(playerId: String): Boolean {
+    fun draw(playerId: String): Card? {
         val player = gameState.players.find { it.id == playerId }
             ?: throw InvalidActionException("Player $playerId not found")
 
@@ -26,20 +26,20 @@ class GameEngine(playerIds: ArrayList<String>) {
             if (snackStash != null) {
                 player.hand.remove(snackStash)
                 gameState.discard.add(snackStash)
-                gameState.discard.add(card)
-                return true
+                return card
             } else {
                 player.lives--
-                return false
+                gameState.discard.add(card)
+                return null
             }
         } else {
             player.hand.add(card)
-            return false
+            return null
         }
     }
 
     fun insertCard(card: Card, position: Int) {
-        gameState.deck.insertAt(card, position)
+        gameState.deck.insertFromTop(card, position)
     }
 
 

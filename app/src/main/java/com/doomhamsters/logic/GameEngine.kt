@@ -29,7 +29,8 @@ class GameEngine(playerIds: ArrayList<String>) {
                 return card
             } else {
                 player.lives--
-                gameState.discard.add(card)
+                val randomPosition = (0..gameState.deck.size()).random()
+                gameState.deck.insertFromTop(card, randomPosition)
                 return null
             }
         } else {

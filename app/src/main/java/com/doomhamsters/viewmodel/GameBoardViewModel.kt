@@ -1,8 +1,7 @@
 package com.doomhamsters.viewmodel
 
 import androidx.lifecycle.ViewModel
-import com.doomhamsters.logic.GameEngine
-import com.doomhamsters.logic.GameState
+import com.doomhamsters.logic.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -17,5 +16,17 @@ class GameBoardViewModel : ViewModel() {
         gameEngine = GameEngine(playerIds)
         _gameState.value = gameEngine?.getState()
     }
+
+    fun draw(playerId: String) {
+        try {
+            gameEngine?.draw(playerId)
+            _gameState.value = gameEngine?.getState()
+        } catch (e: InvalidActionException) {
+            // TODO: draw the errors on the ui somehow.
+        } catch (e: InvalidDrawException) {
+
+        }
+    }
+
 
 }

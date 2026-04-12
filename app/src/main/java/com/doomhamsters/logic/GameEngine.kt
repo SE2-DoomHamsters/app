@@ -36,4 +36,11 @@ class GameEngine(playerIds: ArrayList<String>) {
             player.hand.add(card)
         }
     }
+
+    fun insertCard(card: Card, position: Int) {
+        gameState.deck.insertAt(card, position)
+    }
+
+
+
 }

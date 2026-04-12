@@ -12,4 +12,10 @@ class GameBoardViewModel : ViewModel() {
 
     private val _gameState = MutableStateFlow<GameState?>(null)
     val gameState: StateFlow<GameState?> = _gameState
+
+    fun startGame(playerIds: ArrayList<String>) {
+        gameEngine = GameEngine(playerIds)
+        _gameState.value = gameEngine?.getState()
+    }
+
 }

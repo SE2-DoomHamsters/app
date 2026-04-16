@@ -126,6 +126,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.krossbow.stomp.core)
     implementation(libs.krossbow.websocket.okhttp)
+    implementation(libs.androidx.compose.foundation)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)

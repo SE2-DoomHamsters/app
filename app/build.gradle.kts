@@ -46,6 +46,10 @@ android {
         }
     }
 }
+kotlin {
+    jvmToolchain(17)
+}
+
 
 
 tasks.register<JacocoReport>("jacocoTestReport") {

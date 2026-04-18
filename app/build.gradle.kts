@@ -9,10 +9,10 @@ plugins {
 android {
     namespace = "com.doomhamsters"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(36){
+        minorApiLevel = 1
     }
+}
 
     defaultConfig {
         applicationId = "com.doomhamsters"
@@ -51,9 +51,7 @@ android {
     }
 }
 
-kotlin {
-    jvmToolchain(17)
-}
+
 
 tasks.register<JacocoReport>("jacocoTestReport") {
     group = "verification"
@@ -123,6 +121,7 @@ dependencies {
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
+    testImplementation("org.robolectric:robolectric:4.11.1")
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.junit.jupiter.engine)
     androidTestImplementation(libs.androidx.junit)

@@ -11,7 +11,7 @@ class GameEngine(playerIds: ArrayList<String>) {
     fun getState(): GameState = gameState.copy()
 
 
-    //TODO: Restructure it so the logic of what a card does is handled by the cards, strategy pattern.
+    //Later Restructure it so the logic of what a card does is handled by the cards, strategy pattern.
     fun draw(playerId: String): Card? {
         val player = gameState.players.find { it.id == playerId }
             ?: throw InvalidActionException("Player $playerId not found")
@@ -21,21 +21,21 @@ class GameEngine(playerIds: ArrayList<String>) {
         val card = gameState.deck.draw()
             ?: throw InvalidDrawException("Deck is empty")
 
-        if (card.type == CardType.Doom) {
+        return if (card.type == CardType.Doom) {
             val snackStash = player.hand.find { it.type == CardType.SnackStash }
             if (snackStash != null) {
                 player.hand.remove(snackStash)
                 gameState.discard.add(snackStash)
-                return card
+                card
             } else {
                 player.lives--
                 val randomPosition = (0..gameState.deck.size()).random()
                 gameState.deck.insertFromTop(card, randomPosition)
-                return null
+                null
             }
         } else {
             player.hand.add(card)
-            return null
+            null
         }
     }
 

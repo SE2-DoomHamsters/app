@@ -16,6 +16,7 @@ constraintlayout = "2.1.4"
 krossbow = "7.1.0"
 kotlinx-coroutines-test = "1.10.1"
 foundation = "1.10.6"
+navigation = "2.8.5"
 
 
 [libraries]
@@ -45,6 +46,7 @@ material = { group = "com.google.android.material", name = "material", version.r
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

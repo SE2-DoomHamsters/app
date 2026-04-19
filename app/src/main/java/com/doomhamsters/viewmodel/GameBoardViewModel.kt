@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.doomhamsters.logic.*
 import com.doomhamsters.model.Card
+import com.doomhamsters.model.GameState
+import com.doomhamsters.model.Status
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -30,7 +32,7 @@ class GameBoardViewModel : ViewModel() {
     val pendingDoom: StateFlow<Card?> = _pendingDoom
 
     private fun addLog(message: String) {
-        _log.value = _log.value + message
+        _log.value += message
     }
 
     fun startGame(playerIds: ArrayList<String>) {

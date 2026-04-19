@@ -60,7 +60,7 @@ fun GameBoard(
             Button(onClick = {
                 currentPlayer?.let {
                     viewModel.draw(it.id)
-                    if (pendingDoom == null) viewModel.advanceTurn()
+                    viewModel.advanceTurn()
                 }
             }) {
                 Text("Draw")

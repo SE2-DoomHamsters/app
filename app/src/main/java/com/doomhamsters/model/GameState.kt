@@ -1,5 +1,4 @@
-package com.doomhamsters.logic
-import com.doomhamsters.model.*
+package com.doomhamsters.model
 import java.io.Serializable
 
 enum class Status {

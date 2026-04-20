@@ -32,6 +32,12 @@ android {
                 "proguard-rules.pro"
             )
         }
+        getByName("debug") {
+            enableUnitTestCoverage = true
+            enableAndroidTestCoverage = true
+        }
+
+
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -40,6 +46,14 @@ android {
     buildFeatures {
         compose = true
         viewBinding = true
+    }
+    packaging {
+
+
+        resources {
+            excludes += "META-INF/LICENSE.md"
+            excludes += "META-INF/LICENSE-notice.md"
+        }
     }
     testOptions {
         unitTests {
@@ -133,12 +147,14 @@ dependencies {
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.mockk)
     testImplementation(libs.mockk.agent)
+    testImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.junit.jupiter.engine)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.mockk.android)
     androidTestImplementation(libs.mockk)
     androidTestImplementation(libs.mockk.agent)
     debugImplementation(libs.androidx.compose.ui.tooling)

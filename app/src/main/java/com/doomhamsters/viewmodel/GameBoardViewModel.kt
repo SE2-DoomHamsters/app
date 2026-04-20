@@ -12,35 +12,37 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class GameBoardViewModel : ViewModel() {
+open class GameBoardViewModel(
+    protected var gameEngine: GameEngine? = null
+) : ViewModel() {
 
-    private var gameEngine: GameEngine? = null
+    protected val _gameState = MutableStateFlow<GameState?>(null)
+    open val gameState: StateFlow<GameState?> = _gameState
 
-    private val _gameState = MutableStateFlow<GameState?>(null)
-    val gameState: StateFlow<GameState?> = _gameState
+    protected val _gameOver = MutableSharedFlow<String>()
+    open val gameOver: SharedFlow<String> = _gameOver
 
-    private val _gameOver = MutableSharedFlow<String>()
-    val gameOver: SharedFlow<String> = _gameOver
+    protected val _error = MutableSharedFlow<String>()
+    open val error: SharedFlow<String> = _error
 
-    private val _error = MutableSharedFlow<String>()
-    val error: SharedFlow<String> = _error
+    protected val _log = MutableStateFlow<List<String>>(emptyList())
+    open val log: StateFlow<List<String>> = _log
 
-    private val _log = MutableStateFlow<List<String>>(emptyList())
-    val log: StateFlow<List<String>> = _log
+    protected val _pendingDoom = MutableStateFlow<Card?>(null)
+    open val pendingDoom: StateFlow<Card?> = _pendingDoom
 
-    private val _pendingDoom = MutableStateFlow<Card?>(null)
-    val pendingDoom: StateFlow<Card?> = _pendingDoom
-
-    private fun addLog(message: String) {
+    protected fun addLog(message: String) {
         _log.value += message
     }
 
-    fun startGame(playerIds: ArrayList<String>) {
-        gameEngine = GameEngine(playerIds)
+    open fun startGame(playerIds: ArrayList<String>) {
+        if (gameEngine == null) {
+            gameEngine = GameEngine(playerIds)
+        }
         _gameState.value = gameEngine?.getState()
     }
 
-    fun draw(playerId: String) {
+    open fun draw(playerId: String) {
         try {
             val doomCard = gameEngine?.draw(playerId)
             _gameState.value = gameEngine?.getState()
@@ -57,7 +59,7 @@ class GameBoardViewModel : ViewModel() {
         }
     }
 
-    fun insertDoom(position: Int) {
+    open fun insertDoom(position: Int) {
         _pendingDoom.value?.let { card ->
             gameEngine?.insertCard(card, position)
             _gameState.value = gameEngine?.getState()
@@ -66,7 +68,7 @@ class GameBoardViewModel : ViewModel() {
         }
     }
 
-    fun advanceTurn() {
+    open fun advanceTurn() {
         if (_pendingDoom.value != null) return
         gameEngine?.advanceTurn()
         _gameState.value = gameEngine?.getState()

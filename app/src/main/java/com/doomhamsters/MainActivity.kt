@@ -5,6 +5,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.doomhamsters.ui.theme.DoomHamstersTheme
+import androidx.lifecycle.viewmodel.compose.viewModel
+
 import com.doomhamsters.ui.theme.Orange
 import com.doomhamsters.ui.theme.SoftWhite
 import com.doomhamsters.ui.theme.WarmAlmond
@@ -39,15 +42,25 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             DoomHamstersTheme {
+                // 1. Initialisiere ViewModel
+                val lobbyViewModel: LobbyViewModel = viewModel()
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    LobbyScreen(
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    // 3. Lobby Steuerung
+                    Box(modifier = Modifier.padding(innerPadding)) {
+
+                        // Navigation
+                        MainLobbyNavigation(lobbyViewModel)
+
+                        Greeting(
+                            name = "Android",
+                            modifier = Modifier.padding(innerPadding)
+                        )
+
+                    }
                 }
             }
         }
     }
-}
 
 @Composable
 fun LobbyScreen(modifier: Modifier = Modifier) {

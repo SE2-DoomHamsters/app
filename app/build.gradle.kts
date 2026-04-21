@@ -137,6 +137,7 @@ dependencies {
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.ui)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)

@@ -6,4 +6,5 @@
     <string name="rules_back">Zurück zur Lobby</string>
     <string name="welcome_message">Willkommen bei\n\nDoom Hamsters!</string>
     <string name="rules_button_text">Spielregeln ansehen</string>
+    <string name="start_button_text">Spiel starten</string>
 </resources>

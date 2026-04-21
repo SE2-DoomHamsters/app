@@ -31,7 +31,7 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
     // Hier wird entschieden: Welchen Screen zeigen wir gerade?
     val modifier = null
     when (viewModel.currentStep) {
-        1 -> StartScreen()
+        1 -> StartScreen(viewModel = viewModel)
         2 -> ProfileSetupScreen(viewModel)
         3 -> ActiveLobbyScreen(viewModel)
         4 -> GameBoardScreen()
@@ -41,7 +41,9 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
 @Composable
 fun ProfileSetupScreen(viewModel: LobbyViewModel) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(32.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -76,7 +78,9 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
 
             @OptIn(ExperimentalLayoutApi::class)
             FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
                 horizontalArrangement = Arrangement.Center,
                 maxItemsInEachRow = 4
             ) {
@@ -85,7 +89,8 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
                     val isSelected = viewModel.selectedAvatar == emoji
                     Box(
                         modifier = Modifier
-                            .padding(8.dp).size(60.dp)
+                            .padding(8.dp)
+                            .size(60.dp)
                             .border(
                                 3.dp,
                                 if (isSelected) Color(0xFF6200EE) else Color.Transparent,
@@ -104,7 +109,9 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
             // 4. BUTTON
             Button(
                 onClick = { viewModel.createGroup() },
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
                 // Button ist nur klickbar, wenn Name UND Gruppenname ausgefüllt sind
                 enabled = viewModel.username.isNotBlank() && viewModel.groupName.isNotBlank()
             ) {
@@ -118,7 +125,9 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
     val lobbyState by viewModel.lobby.collectAsState()
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("Lobby ID: ${lobbyState?.lobbyId}", style = MaterialTheme.typography.headlineSmall)
@@ -165,7 +174,10 @@ fun GameBoardScreen() {
 
 
 @Composable
-fun StartScreen(modifier: Modifier = Modifier) {
+fun StartScreen(
+    modifier: Modifier = Modifier,
+    viewModel: LobbyViewModel? = null
+    ) {
     val context = LocalContext.current
 
     Column(
@@ -176,6 +188,9 @@ fun StartScreen(modifier: Modifier = Modifier) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+
+        Spacer(modifier = Modifier.weight(1f))
+
         Text(
             text = stringResource(R.string.welcome_message),
             textAlign = TextAlign.Center,
@@ -185,8 +200,33 @@ fun StartScreen(modifier: Modifier = Modifier) {
             color = Orange
         )
 
-        Spacer(modifier = Modifier.height(40.dp))
+        Spacer(modifier = Modifier.weight(1f))
 
+        // Spiel-start-Button
+        Button(
+            onClick = {
+                // schaltet die Navigation auf den ProfileSetupScreen um!
+                viewModel?.currentStep = 2
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Orange,
+                contentColor = SoftWhite
+            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
+        ) {
+            Text(stringResource(R.string.start_button_text),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = SoftWhite)
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Rules-Button
         Button(
             onClick = {
                 val intent = Intent(context, RulesActivity::class.java)

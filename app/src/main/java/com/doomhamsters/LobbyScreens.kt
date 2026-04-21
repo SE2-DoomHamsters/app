@@ -1,26 +1,40 @@
 package com.doomhamsters
+import android.content.Intent
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.doomhamsters.data.decodeBase64ToBitmap
+import com.doomhamsters.ui.theme.DoomHamstersTheme
+import com.doomhamsters.ui.theme.Orange
+import com.doomhamsters.ui.theme.SoftWhite
+import com.doomhamsters.ui.theme.WarmAlmond
 
 @Composable
 fun MainLobbyNavigation(viewModel: LobbyViewModel) {
     // Hier wird entschieden: Welchen Screen zeigen wir gerade?
+    val modifier = null
     when (viewModel.currentStep) {
-        1 -> ProfileSetupScreen(viewModel)
-        2 -> ActiveLobbyScreen(viewModel)
-        3 -> GameBoardScreen()
+        1 -> StartScreen()
+        2 -> ProfileSetupScreen(viewModel)
+        3 -> ActiveLobbyScreen(viewModel)
+        4 -> GameBoardScreen()
     }
 }
 
@@ -146,5 +160,62 @@ fun GameBoardScreen() {
             text = "GAMEBOARD",
             style = MaterialTheme.typography.headlineLarge
         )
+    }
+}
+
+
+@Composable
+fun StartScreen(modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(WarmAlmond)
+            .padding(24.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = stringResource(R.string.welcome_message),
+            textAlign = TextAlign.Center,
+            lineHeight = 20.sp,
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            color = Orange
+        )
+
+        Spacer(modifier = Modifier.height(40.dp))
+
+        Button(
+            onClick = {
+                val intent = Intent(context, RulesActivity::class.java)
+                context.startActivity(intent)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Orange,
+                contentColor = SoftWhite
+            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.rules_button_text),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = SoftWhite
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun StartScreenPreview() {
+    DoomHamstersTheme {
+        StartScreen()
     }
 }

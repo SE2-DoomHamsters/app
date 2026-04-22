@@ -10,6 +10,9 @@ kotlin = "2.1.0"
 composeBom = "2026.02.01"
 junitJupiterApi = "6.0.3"
 lifecycleViewmodelCompose = "2.8.6"
+mockk = "1.13.10"
+navigationCompose = "2.9.7"
+coroutines = "1.10.1"
 appcompat = "1.6.1"
 material = "1.10.0"
 activity = "1.8.0"
@@ -18,9 +21,6 @@ krossbow = "7.1.0"
 kotlinx-coroutines-test = "1.10.1"
 foundation = "1.10.6"
 navigation = "2.8.5"
-mockk = "1.13.10"
-navigationCompose = "2.9.7"
-coroutines = "1.8.0"
 
 
 ui = "1.10.6"
@@ -51,12 +51,12 @@ krossbow-websocket-okhttp = { module = "org.hildan.krossbow:krossbow-websocket-o
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 mockk-agent = { module = "io.mockk:mockk-agent-jvm", version.ref = "mockk" }
+mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
-mockk-android = { group = "io.mockk", name = "mockk-android", version.ref = "mockk" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
 
 [plugins]

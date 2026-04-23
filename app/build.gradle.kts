@@ -8,11 +8,7 @@ plugins {
 
 android {
     namespace = "com.doomhamsters"
-    compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
-    }
+    compileSdk=36
 
     defaultConfig {
         applicationId = "com.doomhamsters"

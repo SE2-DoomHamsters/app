@@ -21,8 +21,6 @@ krossbow = "7.1.0"
 kotlinx-coroutines-test = "1.10.1"
 foundation = "1.10.6"
 navigation = "2.8.5"
-
-
 ui = "1.10.6"
 
 [libraries]

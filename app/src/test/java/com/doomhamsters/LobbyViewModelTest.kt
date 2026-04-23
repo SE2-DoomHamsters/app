@@ -1,5 +1,4 @@
 package com.doomhamsters
-
 import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
 import io.mockk.coEvery

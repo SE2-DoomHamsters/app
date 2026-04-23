@@ -151,6 +151,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
     testImplementation("org.robolectric:robolectric:4.11.1")
+    testImplementation("org.json:json:20231013")
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.junit.jupiter.engine)
     androidTestImplementation(libs.androidx.junit)

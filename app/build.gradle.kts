@@ -46,7 +46,7 @@ android {
             all {
                 it.useJUnitPlatform()
                 it.finalizedBy(tasks.named("jacocoTestReport"))
-                it.exclude("**/StompServiceTest*")
+                it.exclude("**/StompServiceTest*") //exclude integration test - requires running Spring server
             }
         }
     }

@@ -64,3 +64,4 @@ class LobbyViewModel : ViewModel() {
         viewModelScope.launch { repository.disconnect() }
     }
 }
+}

@@ -17,9 +17,6 @@ class LobbyViewModel(
     private val userId: String = UUID.randomUUID().toString()
 ) : ViewModel() {
     // 1 = Start, 2 = Profil-Setup, 3 = Aktive Lobby, 4 = Gameboard
-
-class LobbyViewModel : ViewModel() {
-    // 1 = Profil-Setup, 2 = Aktive Lobby, 3 = Gameboard
     var currentStep by mutableStateOf(1)
     var groupName by mutableStateOf("")
     var username by mutableStateOf("")
@@ -63,5 +60,4 @@ class LobbyViewModel : ViewModel() {
         super.onCleared()
         viewModelScope.launch { repository.disconnect() }
     }
-}
 }

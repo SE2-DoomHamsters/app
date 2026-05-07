@@ -141,8 +141,6 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.ui)
-    implementation(libs.krossbow.stomp.core)
-    implementation(libs.krossbow.websocket.okhttp)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)

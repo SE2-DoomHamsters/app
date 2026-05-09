@@ -141,6 +141,7 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.ui)
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)

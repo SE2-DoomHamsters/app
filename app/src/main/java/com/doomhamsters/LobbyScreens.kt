@@ -1,4 +1,5 @@
 package com.doomhamsters
+
 import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -25,6 +26,9 @@ import com.doomhamsters.ui.theme.DoomHamstersTheme
 import com.doomhamsters.ui.theme.Orange
 import com.doomhamsters.ui.theme.SoftWhite
 import com.doomhamsters.ui.theme.WarmAlmond
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import androidx.activity.compose.rememberLauncherForActivityResult
 
 @Composable
 fun MainLobbyNavigation(viewModel: LobbyViewModel) {
@@ -40,85 +44,118 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
 
 @Composable
 fun ProfileSetupScreen(viewModel: LobbyViewModel) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Text("Lobby erstellen", style = MaterialTheme.typography.headlineMedium)
-
-            Spacer(Modifier.height(20.dp))
-
-            // 1.NAME
-            OutlinedTextField(
-                value = viewModel.username,
-                onValueChange = { viewModel.username = it },
-                label = { Text("Dein Spielername") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            // 2. GRUPPENNAME
-            OutlinedTextField(
-                value = viewModel.groupName, // Hier wird der Name der Gruppe gespeichert
-                onValueChange = { viewModel.groupName = it },
-                label = { Text("Name der Gruppe / Lobby") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Spacer(Modifier.height(20.dp))
-
-            // 3.EMOJIS
-            Text("Wähle dein Spieler-Icon:")
-
-            @OptIn(ExperimentalLayoutApi::class)
-            FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.Center,
-                maxItemsInEachRow = 4
-            ) {
-                val icons = listOf("🐱", "🐶", "🐷", "🦊", "🤖", "👽", "🐭")
-                icons.forEach { emoji ->
-                    val isSelected = viewModel.selectedAvatar == emoji
-                    Box(
-                        modifier = Modifier
-                            .padding(8.dp)
-                            .size(60.dp)
-                            .border(
-                                3.dp,
-                                if (isSelected) Color(0xFF6200EE) else Color.Transparent,
-                                CircleShape
-                            )
-                            .clickable { viewModel.selectedAvatar = emoji },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(emoji, fontSize = 36.sp)
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(40.dp))
-
-            // 4. BUTTON
-            Button(
-                onClick = { viewModel.createGroup() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                // Button ist nur klickbar, wenn Name UND Gruppenname ausgefüllt sind
-                enabled = viewModel.username.isNotBlank() && viewModel.groupName.isNotBlank()
-            ) {
-                Text("Gruppe erstellen")
+    val scanLauncher = rememberLauncherForActivityResult(
+        contract = ScanContract(),
+        onResult = { result ->
+            if (result.contents != null) {
+                viewModel.joinLobby(result.contents)
             }
         }
+    )
+    val errorState by viewModel.error.collectAsState()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text("Lobby erstellen", style = MaterialTheme.typography.headlineMedium)
+
+        Spacer(Modifier.height(20.dp))
+
+        // 1.NAME
+        OutlinedTextField(
+            value = viewModel.username,
+            onValueChange = { viewModel.username = it },
+            label = { Text("Dein Spielername") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        Spacer(Modifier.height(16.dp))
+
+        // 2. GRUPPENNAME
+        OutlinedTextField(
+            value = viewModel.groupName, // Hier wird der Name der Gruppe gespeichert
+            onValueChange = { viewModel.groupName = it },
+            label = { Text("Name der Gruppe / Lobby") },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true
+        )
+
+        Spacer(Modifier.height(20.dp))
+
+        // 3.EMOJIS
+        Text("Wähle dein Spieler-Icon:")
+
+        @OptIn(ExperimentalLayoutApi::class)
+        FlowRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.Center,
+            maxItemsInEachRow = 4
+        ) {
+            val icons = listOf("🐱", "🐶", "🐷", "🦊", "🤖", "👽", "🐭")
+            icons.forEach { emoji ->
+                val isSelected = viewModel.selectedAvatar == emoji
+                Box(
+                    modifier = Modifier
+                        .padding(8.dp)
+                        .size(60.dp)
+                        .border(
+                            3.dp,
+                            if (isSelected) Color(0xFF6200EE) else Color.Transparent,
+                            CircleShape
+                        )
+                        .clickable { viewModel.selectedAvatar = emoji },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(emoji, fontSize = 36.sp)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(40.dp))
+
+        // 4. BUTTON
+        Button(
+            onClick = { viewModel.createGroup() },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            // Button ist nur klickbar, wenn Name UND Gruppenname ausgefüllt sind
+            enabled = viewModel.username.isNotBlank() && viewModel.groupName.isNotBlank()
+        ) {
+            Text("Gruppe erstellen")
+        }
+        Spacer(Modifier.height(16.dp))
+        Text("ODER")
+        Spacer(Modifier.height(16.dp))
+
+        if (errorState != null) {
+            Text(text = errorState!!, color = Color.Red)
+        }
+        OutlinedButton(
+            onClick = {
+                val options = ScanOptions().apply {
+                    setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                    setPrompt("Scanne den QR-Code der Lobby")
+                    setBeepEnabled(false)
+                }
+                scanLauncher.launch(options)
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            enabled = viewModel.username.isNotBlank()
+        ) {
+            Text("QR-Code scannen & Beitreten")
+        }
     }
+}
 
 @Composable
 fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
@@ -154,11 +191,13 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
 
         Spacer(modifier = Modifier.weight(1f))
         Button(onClick = {
-            viewModel.startGame() }, modifier = Modifier.fillMaxWidth()) {
+            viewModel.startGame()
+        }, modifier = Modifier.fillMaxWidth()) {
             Text("SPIEL STARTEN")
         }
     }
 }
+
 @Composable
 fun GameBoardScreen() {
     Box(
@@ -177,7 +216,7 @@ fun GameBoardScreen() {
 fun StartScreen(
     modifier: Modifier = Modifier,
     viewModel: LobbyViewModel? = null
-    ) {
+) {
     val context = LocalContext.current
 
     Column(
@@ -218,10 +257,12 @@ fun StartScreen(
             ),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
         ) {
-            Text(stringResource(R.string.start_button_text),
+            Text(
+                stringResource(R.string.start_button_text),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
-                color = SoftWhite)
+                color = SoftWhite
+            )
         }
 
         Spacer(modifier = Modifier.height(20.dp))

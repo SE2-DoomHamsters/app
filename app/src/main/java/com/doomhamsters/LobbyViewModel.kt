@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class LobbyViewModel(
-    private val repository: LobbyRepository = LobbyRepository("10.39.198.20:53217"),
+    private val repository: LobbyRepository = LobbyRepository("10.0.2.2:53217"),
     private val userId: String = UUID.randomUUID().toString()
 ) : ViewModel() {
     // 1 = Start, 2 = Profil-Setup, 3 = Aktive Lobby, 4 = Gameboard

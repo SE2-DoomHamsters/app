@@ -1,0 +1,106 @@
+package com.doomhamsters.ui.gameboard
+
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.doomhamsters.model.Card
+import com.doomhamsters.model.CardType
+import com.doomhamsters.ui.theme.*
+
+@Composable
+fun CardFaceDown(modifier: Modifier = Modifier, shadowOffset: () -> Float = { 4f }) {
+    Box(
+        modifier = modifier
+            .width(100.dp)
+            .height(150.dp)
+            .drawBehind {
+                val radiusPx = 8.dp.toPx()
+                drawRoundRect(
+                    color = OutlineDark,
+                    topLeft = Offset(0f, shadowOffset().dp.toPx()),
+                    size = size,
+                    cornerRadius = CornerRadius(radiusPx, radiusPx)
+                )
+            }
+            .background(OutlineDark, RoundedCornerShape(8.dp))
+            .padding(2.dp)
+            .background(CardDarkMaroon, RoundedCornerShape(6.dp))
+            .padding(3.dp)
+            .background(OutlineDark, RoundedCornerShape(4.dp))
+    )
+}
+
+@Composable
+fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: Modifier = Modifier, shadowOffset: () -> Float = { 4f }) {
+    val (bgColor, innerBorderColor, textColor) = when (card.type) {
+        CardType.Doom -> Triple(DoomColor, Color(0xFFC94A4A), BackgroundCream)
+        CardType.SnackStash -> Triple(SnackStashColor, Color(0xFFA3C968), CardDarkMaroon)
+        CardType.Normal -> Triple(BackgroundCream, AccentOrange, CardDarkMaroon)
+    }
+
+    val actualInnerBorder = if (isSelected) Color.White else innerBorderColor
+    val animatedDarkness by animateFloatAsState(targetValue = if (isDefocused) 0.7f else 0f, animationSpec = tween(250), label = "darkOverlay")
+
+    Box(
+        modifier = modifier
+            .width(100.dp)
+            .height(150.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .drawBehind {
+                    val radiusPx = 8.dp.toPx()
+                    drawRoundRect(
+                        color = OutlineDark,
+                        topLeft = Offset(0f, shadowOffset().dp.toPx()),
+                        size = size,
+                        cornerRadius = CornerRadius(radiusPx, radiusPx)
+                    )
+                }
+                .background(OutlineDark, RoundedCornerShape(8.dp))
+                .padding(2.dp)
+                .background(actualInnerBorder, RoundedCornerShape(6.dp))
+                .padding(3.dp)
+                .background(bgColor, RoundedCornerShape(4.dp))
+        ) {
+            Box(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+                Text(
+                    text = card.type.name.replace("S", "\nS"),
+                    color = textColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = animatedDarkness }
+                .background(OutlineDark, RoundedCornerShape(8.dp))
+        )
+    }
+}

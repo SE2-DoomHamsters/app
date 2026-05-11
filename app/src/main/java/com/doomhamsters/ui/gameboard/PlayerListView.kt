@@ -1,4 +1,4 @@
-package com.doomhamsters.ui
+package com.doomhamsters.ui.gameboard
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text

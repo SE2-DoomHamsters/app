@@ -1,6 +1,7 @@
 package com.doomhamsters
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
@@ -16,8 +17,8 @@ class LobbyViewModel(
     private val repository: LobbyRepository = LobbyRepository("10.0.2.2:53217"),
     private val userId: String = UUID.randomUUID().toString()
 ) : ViewModel() {
-    // 1 = Start, 2 = Profil-Setup, 3 = Aktive Lobby, 4 = Gameboard
-    var currentStep by mutableStateOf(1)
+    // 1 = Start, 2 = Profil-Setup, 3 = Aktive Lobby, 4 = Gameboard, 5 = Regeln
+    var currentStep by mutableIntStateOf(1)
     var groupName by mutableStateOf("")
     var username by mutableStateOf("")
     var selectedAvatar by mutableStateOf("dog")

@@ -1,5 +1,4 @@
 package com.doomhamsters
-import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,9 +10,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -21,6 +20,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.doomhamsters.data.decodeBase64ToBitmap
+import com.doomhamsters.ui.theme.DarkBrown
 import com.doomhamsters.ui.theme.DoomHamstersTheme
 import com.doomhamsters.ui.theme.Orange
 import com.doomhamsters.ui.theme.SoftWhite
@@ -29,12 +29,12 @@ import com.doomhamsters.ui.theme.WarmAlmond
 @Composable
 fun MainLobbyNavigation(viewModel: LobbyViewModel) {
     // Hier wird entschieden: Welchen Screen zeigen wir gerade?
-    val modifier = null
     when (viewModel.currentStep) {
         1 -> StartScreen(viewModel = viewModel)
         2 -> ProfileSetupScreen(viewModel)
         3 -> ActiveLobbyScreen(viewModel)
         4 -> GameBoardScreen()
+        5 -> RulesScreen(onBackClick = { viewModel.currentStep = 1 })
     }
 }
 
@@ -178,8 +178,6 @@ fun StartScreen(
     modifier: Modifier = Modifier,
     viewModel: LobbyViewModel? = null
     ) {
-    val context = LocalContext.current
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -229,8 +227,7 @@ fun StartScreen(
         // Rules-Button
         Button(
             onClick = {
-                val intent = Intent(context, RulesActivity::class.java)
-                context.startActivity(intent)
+                viewModel?.currentStep = 5
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -252,10 +249,78 @@ fun StartScreen(
     }
 }
 
+@Composable
+fun RulesScreen(modifier: Modifier = Modifier, onBackClick: () -> Unit) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(WarmAlmond)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = stringResource(R.string.rules_title),
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            color = Orange
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.White.copy(alpha = 0.5f), // Dein 80% Weiß
+            modifier = Modifier
+                .fillMaxWidth()
+                .shadow(elevation = 1.dp, shape = RoundedCornerShape(16.dp))
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.rules_content),
+                    fontSize = 18.sp,
+                    color = DarkBrown
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        Button(
+            onClick = onBackClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp),
+            shape = RoundedCornerShape(50),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Orange,
+                contentColor = Color.White
+            ),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.rules_back),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = SoftWhite
+            )
+        }
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 fun StartScreenPreview() {
     DoomHamstersTheme {
         StartScreen()
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun RulesPreview() {
+    DoomHamstersTheme {
+        RulesScreen(onBackClick = {})
     }
 }

@@ -52,6 +52,41 @@ class LobbyViewModel(
             }
         }
     }
+    fun joinLobby(scannedLobbyId: String) {
+        if (username.isBlank()) {
+            _error.value = "Bitte gib zuerst deinen Spielernamen ein!"
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _error.value = null
+                repository.connect()
+                val user = User(userId, username, selectedAvatar)
+
+                val joinedLobby = repository.joinLobby(scannedLobbyId, user)
+
+                if (joinedLobby != null) {
+                    _lobby.value = joinedLobby
+
+                    launch {
+                        repository.subscribeLobbyUpdates(joinedLobby.lobbyId)
+                            .collect { updated -> _lobby.value = updated }
+                    }
+
+                    currentStep = 3
+                } else {
+                    _error.value = "Lobby '$scannedLobbyId' wurde nicht gefunden!"
+                }
+
+            } catch (e: Exception) {
+                _error.value = "Fehler beim Beitreten: ${e.message}"
+            }
+        }
+    }
+
+
+
 
     fun startGame() {
         currentStep = 4

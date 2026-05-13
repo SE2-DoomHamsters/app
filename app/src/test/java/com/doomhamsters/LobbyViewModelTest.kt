@@ -147,6 +147,66 @@ class LobbyViewModelTest {
 
         assertEquals(2, viewModel.lobby.value?.members?.size)
     }
+    // ── joinLobby ─────────────────────────────────────────────────────────────
+
+    @Test
+    fun `joinLobby zeigt Fehler wenn username leer ist`() = runTest {
+        viewModel.username = "" // Name fehlt
+
+        viewModel.joinLobby("DOOMUNIT")
+
+        assertEquals("Bitte gib zuerst deinen Spielernamen ein!", viewModel.error.value)
+        assertEquals(1, viewModel.currentStep)
+        assertNull(viewModel.lobby.value)
+    }
+
+    @Test
+    fun `joinLobby wechselt zu Step 3 bei erfolgreichem Beitritt`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.joinLobby(any(), any()) } returns fakeLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+
+        viewModel.username = "Anna"
+        viewModel.selectedAvatar = "🐱"
+
+        viewModel.joinLobby("DOOMUNIT")
+
+        assertEquals(3, viewModel.currentStep)
+        assertEquals(fakeLobby, viewModel.lobby.value)
+        assertNull(viewModel.error.value)
+
+        // Prüfen, ob die richtigen Daten ans Repository geschickt wurden
+        coVerify {
+            mockRepo.joinLobby("DOOMUNIT", User("fixed-id", "Anna", "🐱"))
+        }
+    }
+
+    @Test
+    fun `joinLobby zeigt Fehler wenn Lobby nicht existiert`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
+        // Simulieren: Backend findet die Lobby nicht und gibt null zurück
+        coEvery { mockRepo.joinLobby(any(), any()) } returns null
+
+        viewModel.username = "Anna"
+
+        viewModel.joinLobby("FALSCHE_LOBBY")
+
+        assertEquals("Lobby 'FALSCHE_LOBBY' wurde nicht gefunden!", viewModel.error.value)
+        assertEquals(1, viewModel.currentStep) // Bleibt im Startbildschirm
+    }
+
+    @Test
+    fun `joinLobby fängt Netzwerkfehler ab`() = runTest {
+        // Simulieren: Server ist offline
+        coEvery { mockRepo.connect() } throws RuntimeException("Server down")
+
+        viewModel.username = "Anna"
+
+        viewModel.joinLobby("DOOMUNIT")
+
+        assertEquals("Fehler beim Beitreten: Server down", viewModel.error.value)
+        assertEquals(1, viewModel.currentStep)
+    }
 
     // ── startGame ─────────────────────────────────────────────────────────────
 

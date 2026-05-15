@@ -42,8 +42,7 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
         viewModel.navigateToGame.collect { (gameId, playerId) ->
             activeGameId = gameId
             activePlayerId = playerId
-            // Sobald wir die IDs haben, schalten wir auf den Game-Screen um!
-            viewModel.currentStep = 4
+            //viewModel.currentStep = 4
         }
     }
     when (viewModel.currentStep) {

@@ -56,6 +56,7 @@ class LobbyViewModel(
                             .collect { newGameId ->
                                 // Backend sagt "Start!". Schicken gameId und userId an die UI
                                 _navigateToGame.emit(Pair(newGameId, userId))
+                                currentStep = 4
                             }
                     }
 
@@ -92,6 +93,7 @@ class LobbyViewModel(
                                 .collect { newGameId ->
                                     // Backend sagt "Start!". Schicken von gameId und userId an die UI
                                     _navigateToGame.emit(Pair(newGameId, userId))
+                                    currentStep = 4
                                 }
                         }
 

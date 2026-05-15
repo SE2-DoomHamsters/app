@@ -1,16 +1,24 @@
 package com.doomhamsters
+
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import java.util.UUID
 
-class LobbyViewModel : ViewModel() {
-    // 1 = Profil-Setup, 2 = Aktive Lobby, 3 = Gameboard
-    var currentStep by mutableStateOf(1)
+class LobbyViewModel(
+    private val repository: LobbyRepository = LobbyRepository("10.0.2.2:53217"),
+    private val userId: String = UUID.randomUUID().toString()
+) : ViewModel() {
+    // 1 = Start, 2 = Profil-Setup, 3 = Aktive Lobby, 4 = Gameboard, 5 = Regeln
+    var currentStep by mutableIntStateOf(1)
     var groupName by mutableStateOf("")
     var username by mutableStateOf("")
     var selectedAvatar by mutableStateOf("dog")
@@ -18,21 +26,74 @@ class LobbyViewModel : ViewModel() {
     private val _lobby = MutableStateFlow<Lobby?>(null)
     val lobby: StateFlow<Lobby?> = _lobby
 
-    fun createGroup() {
-        if (username.isNotBlank() && groupName.isNotBlank()) {
-            // HIER findet später der echte Netzwerk-Call statt
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
 
-            // Simulation der Antwort vom Backend:
-            _lobby.value = Lobby(
-                lobbyId = groupName.uppercase(), // Wir nehmen den Namen als ID
-                members = listOf(User("1", username, selectedAvatar)),
-                qrCodeBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="
-            )
-            currentStep = 2
+
+    fun createGroup() {
+        if (username.isBlank() || groupName.isBlank()) return
+        viewModelScope.launch {
+            try {
+                _error.value = null
+                repository.connect()
+                val user = User(userId, username, selectedAvatar)
+                val createdLobby = repository.createLobby(groupName, user)
+                _lobby.value = createdLobby
+
+                // Keep lobby state in sync whenever another player joins
+                launch {
+                    repository.subscribeLobbyUpdates(createdLobby.lobbyId)
+                        .collect { updated -> _lobby.value = updated }
+                }
+
+                currentStep = 3
+            } catch (e: Exception) {
+                _error.value = e.message
+            }
         }
     }
+    fun joinLobby(scannedLobbyId: String) {
+        if (username.isBlank()) {
+            _error.value = "Bitte gib zuerst deinen Spielernamen ein!"
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                _error.value = null
+                repository.connect()
+                val user = User(userId, username, selectedAvatar)
+
+                val joinedLobby = repository.joinLobby(scannedLobbyId, user)
+
+                if (joinedLobby != null) {
+                    _lobby.value = joinedLobby
+
+                    launch {
+                        repository.subscribeLobbyUpdates(joinedLobby.lobbyId)
+                            .collect { updated -> _lobby.value = updated }
+                    }
+
+                    currentStep = 3
+                } else {
+                    _error.value = "Lobby '$scannedLobbyId' wurde nicht gefunden!"
+                }
+
+            } catch (e: Exception) {
+                _error.value = "Fehler beim Beitreten: ${e.message}"
+            }
+        }
+    }
+
+
+
+
     fun startGame() {
-        // Logik
-        currentStep = 3
+        currentStep = 4
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        viewModelScope.launch { repository.disconnect() }
     }
 }

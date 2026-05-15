@@ -1,3 +1,10 @@
 <resources>
     <string name="app_name">DoomHamsters</string>
+    <string name="title_activity_rules">RulesActivity</string>
+    <string name="rules_title">Spielregeln</string>
+    <string name="rules_content">Hier werden die Spielregeln stehen:\n\n 1. ... \n\n 2. ... \n\n 3. ...</string>
+    <string name="rules_back">Zurück zur Lobby</string>
+    <string name="welcome_message">Willkommen bei\n\nDoom Hamsters!</string>
+    <string name="rules_button_text">Spielregeln ansehen</string>
+    <string name="start_button_text">Spiel starten</string>
 </resources>

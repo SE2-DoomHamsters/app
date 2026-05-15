@@ -1,5 +1,7 @@
 package com.doomhamsters.model
 
+import org.json.JSONArray
+
 class Deck {
     // Arraylist instead of Dequeue cause you can insert easier into it.
     private val cards = ArrayList<Card>()
@@ -24,5 +26,20 @@ class Deck {
         cards.add(actualPosition, card)
     }
 
+    fun toJson(): JSONArray {
+        val arr = JSONArray()
+        cards.forEach { arr.put(it.toJson()) }
+        return arr
+    }
 
+    companion object {
+        fun fromJson(jsonArray: JSONArray): Deck {
+            val deck = Deck()
+            for (i in 0 until jsonArray.length()) {
+                deck.cards.add(Card.fromJson(jsonArray.getJSONObject(i)))
+            }
+            return deck
+        }
+    }
 }
+

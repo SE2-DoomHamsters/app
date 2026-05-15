@@ -9,12 +9,14 @@ import androidx.lifecycle.viewModelScope
 import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
 
 class LobbyViewModel(
-    private val repository: LobbyRepository = LobbyRepository("10.0.2.2:53217"),
+    private val repository: LobbyRepository = LobbyRepository("192.168.0.181:53217"),
     private val userId: String = UUID.randomUUID().toString()
 ) : ViewModel() {
     // 1 = Start, 2 = Profil-Setup, 3 = Aktive Lobby, 4 = Gameboard, 5 = Regeln
@@ -29,6 +31,8 @@ class LobbyViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    private val _navigateToGame = MutableSharedFlow<Pair<String, String>>()
+    val navigateToGame: SharedFlow<Pair<String, String>> = _navigateToGame
 
     fun createGroup() {
         if (username.isBlank() || groupName.isBlank()) return
@@ -45,6 +49,15 @@ class LobbyViewModel(
                     repository.subscribeLobbyUpdates(createdLobby.lobbyId)
                         .collect { updated -> _lobby.value = updated }
                 }
+
+                    // Lauschen auf Spielstart für den Host
+                    launch {
+                        repository.subscribeGameStart(createdLobby.lobbyId)
+                            .collect { newGameId ->
+                                // Backend sagt "Start!". Schicken gameId und userId an die UI
+                                _navigateToGame.emit(Pair(newGameId, userId))
+                            }
+                    }
 
                 currentStep = 3
             } catch (e: Exception) {
@@ -73,6 +86,15 @@ class LobbyViewModel(
                         repository.subscribeLobbyUpdates(joinedLobby.lobbyId)
                             .collect { updated -> _lobby.value = updated }
                     }
+                        // Lauschen auf Spielstart für alle Gäste
+                        launch {
+                            repository.subscribeGameStart(joinedLobby.lobbyId)
+                                .collect { newGameId ->
+                                    // Backend sagt "Start!". Schicken von gameId und userId an die UI
+                                    android.util.Log.d("WEBSOCKET_TEST", "JUHU! Start-Signal vom Server erhalten! GameID: \$newGameId")
+                                    _navigateToGame.emit(Pair(newGameId, userId))
+                                }
+                        }
 
                     currentStep = 3
                 } else {
@@ -89,7 +111,18 @@ class LobbyViewModel(
 
 
     fun startGame() {
-        currentStep = 4
+        val currentLobbyId = _lobby.value?.lobbyId ?: return
+        viewModelScope.launch {
+            try {
+                android.util.Log.d("WEBSOCKET_TEST", "Sende START-Befehl an Server für Lobby-ID: >>$currentLobbyId<<")
+                _error.value = null
+                // Aufrufen den Post request im Backend
+                repository.triggerGameStart(currentLobbyId)
+            } catch (e: Exception) {
+                android.util.Log.e("FEHLERSUCHE", "Start-Button Fehler: ", e)
+                _error.value = "Konnte Spiel nicht starten: ${e.message}"
+            }
+        }
     }
 
     override fun onCleared() {

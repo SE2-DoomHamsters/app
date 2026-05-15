@@ -119,7 +119,6 @@ class LobbyRepository(
         checkNotNull(session) { "Call connect() before subscribing" }
             .subscribeText("/topic/game/$lobbyId")
             .map { jsonString ->
-                android.util.Log.d("WEBSOCKET_TEST", "RAW SIGNAL VOM SERVER: $jsonString")
                 JSONObject(jsonString).getString("gameId")
             }
 }

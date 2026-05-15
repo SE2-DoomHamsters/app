@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 class LobbyViewModel(
-    private val repository: LobbyRepository = LobbyRepository("192.168.0.181:53217"),
+    private val repository: LobbyRepository = LobbyRepository("10.0.2.2:53217"),
     private val userId: String = UUID.randomUUID().toString()
 ) : ViewModel() {
     // 1 = Start, 2 = Profil-Setup, 3 = Aktive Lobby, 4 = Gameboard, 5 = Regeln
@@ -91,7 +91,6 @@ class LobbyViewModel(
                             repository.subscribeGameStart(joinedLobby.lobbyId)
                                 .collect { newGameId ->
                                     // Backend sagt "Start!". Schicken von gameId und userId an die UI
-                                    android.util.Log.d("WEBSOCKET_TEST", "JUHU! Start-Signal vom Server erhalten! GameID: \$newGameId")
                                     _navigateToGame.emit(Pair(newGameId, userId))
                                 }
                         }
@@ -114,12 +113,10 @@ class LobbyViewModel(
         val currentLobbyId = _lobby.value?.lobbyId ?: return
         viewModelScope.launch {
             try {
-                android.util.Log.d("WEBSOCKET_TEST", "Sende START-Befehl an Server für Lobby-ID: >>$currentLobbyId<<")
                 _error.value = null
                 // Aufrufen den Post request im Backend
                 repository.triggerGameStart(currentLobbyId)
             } catch (e: Exception) {
-                android.util.Log.e("FEHLERSUCHE", "Start-Button Fehler: ", e)
                 _error.value = "Konnte Spiel nicht starten: ${e.message}"
             }
         }

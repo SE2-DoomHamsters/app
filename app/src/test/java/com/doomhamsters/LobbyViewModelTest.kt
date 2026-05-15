@@ -10,6 +10,7 @@ import io.mockk.Runs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -215,6 +216,57 @@ class LobbyViewModelTest {
         viewModel.startGame()
 
         assertEquals(4, viewModel.currentStep)
+    }
+    @Test
+    fun `startGame ruft triggerGameStart im Repository auf`() = runTest {
+        //  Setup
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+        coEvery { mockRepo.subscribeGameStart(any()) } returns emptyFlow()
+
+        // Daten setzen
+        viewModel.username = "Christian"
+        viewModel.groupName = "DoomUnit"
+
+        // Lobby erstellen
+        viewModel.createGroup()
+
+        //Start-Knopf drücken
+        viewModel.startGame()
+
+        //Verifizieren
+        coVerify { mockRepo.triggerGameStart("DOOMUNIT") }
+    }
+    @Test
+    fun `Navigation wird getriggert wenn Server das Start-Signal sendet`() = runTest {
+        // Setup
+        val gameStartFlow = MutableSharedFlow<String>()
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+        coEvery { mockRepo.subscribeGameStart(any()) } returns gameStartFlow
+
+        // Beobachten des Navigationsflows in einer Liste
+        val navEvents = mutableListOf<Pair<String, String>>()
+        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.navigateToGame.collect { navEvents.add(it) }
+        }
+
+        // Lobby erstellen
+        viewModel.username = "Christian"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+
+        // Der Server schickt die Game-ID über den Kanal
+        gameStartFlow.emit("MEINE_TEST_UUID")
+
+        // Event bei der Ui angekommen?
+        assertEquals(1, navEvents.size)
+        assertEquals("MEINE_TEST_UUID", navEvents[0].first) // gameId
+        assertEquals("fixed-id", navEvents[0].second)        // userId
+
+        collectJob.cancel()
     }
 
     // ── onCleared ─────────────────────────────────────────────────────────────

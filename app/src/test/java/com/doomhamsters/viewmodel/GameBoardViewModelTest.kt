@@ -29,7 +29,10 @@ class GameBoardViewModelTest {
     fun setup() {
         Dispatchers.setMain(testDispatcher)
         mockkConstructor(GameEngine::class)
-        viewModel = GameBoardViewModel()
+        viewModel = GameBoardViewModel(
+            gameId = "testGame",
+            playerId = "testPlayer"
+        )
 
         mockGameState = mockk(relaxed = true)
         every { anyConstructed<GameEngine>().getState() } returns mockGameState

@@ -31,15 +31,29 @@ import com.doomhamsters.ui.theme.WarmAlmond
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import androidx.activity.compose.rememberLauncherForActivityResult
+import com.doomhamsters.viewmodel.GameBoardViewModel
 
 @Composable
 fun MainLobbyNavigation(viewModel: LobbyViewModel) {
     // Hier wird entschieden: Welchen Screen zeigen wir gerade?
+    var activeGameId by remember { mutableStateOf<String?>(null) }
+    var activePlayerId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        viewModel.navigateToGame.collect { (gameId, playerId) ->
+            activeGameId = gameId
+            activePlayerId = playerId
+            //viewModel.currentStep = 4
+        }
+    }
     when (viewModel.currentStep) {
         1 -> StartScreen(viewModel = viewModel)
         2 -> ProfileSetupScreen(viewModel)
         3 -> ActiveLobbyScreen(viewModel)
-        4 -> GameBoardScreen()
+        4 -> {
+            if (activeGameId != null && activePlayerId != null) {
+                GameBoardScreen(gameId = activeGameId!!, playerId = activePlayerId!!)
+            }
+        }
         5 -> RulesScreen(onBackClick = { viewModel.currentStep = 1 })
     }
 }
@@ -201,7 +215,8 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
 }
 
 @Composable
-fun GameBoardScreen() {
+fun GameBoardScreen(gameId: String, playerId: String) {
+    val viewModel = remember { GameBoardViewModel(gameId, playerId) }
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center

@@ -10,7 +10,9 @@ import io.mockk.Runs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -25,6 +27,7 @@ class LobbyViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var mockRepo: LobbyRepository
     private lateinit var viewModel: LobbyViewModel
+    private lateinit var gameStartFlow: MutableSharedFlow<String>
 
     private val fakeLobby = Lobby(
         lobbyId = "DOOMUNIT",
@@ -36,6 +39,8 @@ class LobbyViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         mockRepo = mockk(relaxed = true)
+        gameStartFlow = MutableSharedFlow<String>()
+        coEvery { mockRepo.subscribeGameStart(any()) } returns gameStartFlow
         viewModel = LobbyViewModel(repository = mockRepo, userId = "fixed-id")
     }
 
@@ -211,10 +216,65 @@ class LobbyViewModelTest {
     // ── startGame ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `startGame wechselt zu Step 4`() {
+    fun `startGame wechselt zu Step 4`() = runTest {
+        viewModel.username = "Hamster1"
+        viewModel.groupName = "TestGruppe"
+        viewModel.createGroup()
+        advanceUntilIdle()
+        gameStartFlow.emit("neue-game-uuid")
+        advanceUntilIdle()
+        assertEquals(4, viewModel.currentStep)
+    }
+    @Test
+    fun `startGame ruft triggerGameStart im Repository auf`() = runTest {
+        //  Setup
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+        coEvery { mockRepo.subscribeGameStart(any()) } returns emptyFlow()
+
+        // Daten setzen
+        viewModel.username = "Christian"
+        viewModel.groupName = "DoomUnit"
+
+        // Lobby erstellen
+        viewModel.createGroup()
+
+        //Start-Knopf drücken
         viewModel.startGame()
 
-        assertEquals(4, viewModel.currentStep)
+        //Verifizieren
+        coVerify { mockRepo.triggerGameStart("DOOMUNIT") }
+    }
+    @Test
+    fun `Navigation wird getriggert wenn Server das Start-Signal sendet`() = runTest {
+        // Setup
+        val gameStartFlow = MutableSharedFlow<String>()
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+        coEvery { mockRepo.subscribeGameStart(any()) } returns gameStartFlow
+
+        // Beobachten des Navigationsflows in einer Liste
+        val navEvents = mutableListOf<Pair<String, String>>()
+        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.navigateToGame.collect { navEvents.add(it) }
+        }
+
+        // Lobby erstellen
+        viewModel.username = "Christian"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+
+        // Der Server schickt die Game-ID über den Kanal
+        gameStartFlow.emit("MEINE_TEST_UUID")
+
+        // Event bei der Ui angekommen?
+        assertEquals(1, navEvents.size)
+        assertEquals("MEINE_TEST_UUID", navEvents[0].first) // gameId
+        assertEquals("fixed-id", navEvents[0].second)        // userId
+
+        collectJob.cancel()
     }
 
     // ── onCleared ─────────────────────────────────────────────────────────────

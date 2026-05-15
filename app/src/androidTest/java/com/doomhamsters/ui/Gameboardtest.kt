@@ -300,7 +300,7 @@ class GameBoardTest {
 
 
 
-class FakeGameBoardViewModel : GameBoardViewModel(null) {
+class FakeGameBoardViewModel : GameBoardViewModel(gameId = "fake", playerId = "fake") {
     var drawCalledWith: String? = null
     var insertDoomCalledWith: Int? = null
     var advanceTurnCalled = false

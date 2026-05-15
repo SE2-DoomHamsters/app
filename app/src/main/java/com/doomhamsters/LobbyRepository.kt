@@ -92,6 +92,35 @@ class LobbyRepository(
         checkNotNull(session) { "Call connect() before subscribing" }
             .subscribeText("/topic/lobby/$lobbyId")
             .map { it.toLobby() }
+    /**
+     * Sagt dem Server, dass das Spiel für diese Lobby gestartet werden soll.
+     * Aufruf durch den Host.
+     */
+    suspend fun triggerGameStart(lobbyId: String) {
+        val body = ByteArray(0).toRequestBody("application/json".toMediaType())
+
+        val request = Request.Builder()
+            .url("http://$baseUrl/api/game/start?lobbyId=$lobbyId")
+            .post(body)
+            .build()
+
+        withContext(Dispatchers.IO) {
+            httpClient.newCall(request).execute().use { response ->
+                check(response.isSuccessful) { "Game start failed: ${response.code}" }
+            }
+        }
+    }
+
+    /**
+     * Lauscht auf das Start-Event vom Server.
+     * Aufruf durch ALLE Mitglieder der Lobby.
+     */
+    suspend fun subscribeGameStart(lobbyId: String): Flow<String> =
+        checkNotNull(session) { "Call connect() before subscribing" }
+            .subscribeText("/topic/game/$lobbyId")
+            .map { jsonString ->
+                JSONObject(jsonString).getString("gameId")
+            }
 }
 
 // ── Helper Methods ─────────────────────────────────────────────────────────────

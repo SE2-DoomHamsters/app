@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 open class GameBoardViewModel(
+    val gameId: String,
+    val playerId: String,
     protected var gameEngine: GameEngine? = null
 ) : ViewModel() {
 

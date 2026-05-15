@@ -8,6 +8,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.Runs
+import io.mockk.mockkStatic
 import kotlinx.coroutines.test.runTest
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
@@ -18,6 +19,7 @@ import okhttp3.Response
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.hildan.krossbow.stomp.StompClient
 import org.hildan.krossbow.stomp.StompSession
+import org.hildan.krossbow.stomp.subscribeText
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
@@ -75,6 +77,48 @@ class LobbyRepositoryTest {
         repository.disconnect()
 
         assertNull(repository.session)
+    }
+    @Test
+    fun `triggerGameStart sends post request to correct url`() = runTest {
+        // Erfolgreiche Antwort simulieren
+        stubHttpResponse(200, "")
+
+        // Funktion aufrufen
+        repository.triggerGameStart("TEST_LOBBY")
+
+        // Enthält die Url den Query-Parameter?
+        coVerify {
+            mockHttpClient.newCall(match { request ->
+                val url = request.url.toString()
+                // Überprüfung der echten Url Struktur
+                url.contains("/api/game/start") &&
+                        url.contains("lobbyId=TEST_LOBBY") &&
+                        request.method == "POST"
+            })
+        }
+    }
+    @Test
+    fun `subscribeGameStart extrahiert die gameId korrekt aus dem JSON`() = runTest {
+        mockkStatic("org.hildan.krossbow.stomp.StompSessionKt")
+        // 1. Verbindung simulieren
+        coEvery { mockStompClient.connect(any()) } returns mockSession
+        repository.connect()
+
+        // Fake-Signal vorbereiten
+        val serverSignal = """{"gameId":"neue-game-uuid-123"}"""
+
+        // subscribeText liefert einen Flow<String> , daher erstellung einer Flow mit dem JSON-String
+        val stompFlow = kotlinx.coroutines.flow.flowOf(serverSignal)
+
+        coEvery { mockSession.subscribeText(any()) } returns stompFlow
+
+        // Flow vom Repository abfangen
+        val repoFlow = repository.subscribeGameStart("TEST_LOBBY")
+
+        // Kommt die ID sauber an?
+        repoFlow.collect { extractedId ->
+            assertEquals("neue-game-uuid-123", extractedId)
+        }
     }
 
     // ── createLobby ──────────────────────────────────────────────────────────

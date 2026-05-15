@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -26,6 +27,7 @@ class LobbyViewModelTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var mockRepo: LobbyRepository
     private lateinit var viewModel: LobbyViewModel
+    private lateinit var gameStartFlow: MutableSharedFlow<String>
 
     private val fakeLobby = Lobby(
         lobbyId = "DOOMUNIT",
@@ -37,6 +39,8 @@ class LobbyViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         mockRepo = mockk(relaxed = true)
+        gameStartFlow = MutableSharedFlow<String>()
+        coEvery { mockRepo.subscribeGameStart(any()) } returns gameStartFlow
         viewModel = LobbyViewModel(repository = mockRepo, userId = "fixed-id")
     }
 
@@ -212,9 +216,13 @@ class LobbyViewModelTest {
     // ── startGame ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `startGame wechselt zu Step 4`() {
-        viewModel.startGame()
-
+    fun `startGame wechselt zu Step 4`() = runTest {
+        viewModel.username = "Hamster1"
+        viewModel.groupName = "TestGruppe"
+        viewModel.createGroup()
+        advanceUntilIdle()
+        gameStartFlow.emit("neue-game-uuid")
+        advanceUntilIdle()
         assertEquals(4, viewModel.currentStep)
     }
     @Test

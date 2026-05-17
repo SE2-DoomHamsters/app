@@ -148,7 +148,7 @@ class LobbyViewModel(
                 isStartingGame = true
                 _error.value = null
                 Log.d(TAG, "Starting game for lobby=$currentLobbyId")
-                repository.triggerGameStart(currentLobbyId)
+                repository.triggerGameStart(currentLobbyId, userId)
                 repository.getLobby(currentLobbyId)?.let(::applyLobbySnapshot)
             } catch (e: Exception) {
                 val refreshedLobby = runCatching { repository.getLobby(currentLobbyId) }.getOrNull()
@@ -171,6 +171,16 @@ class LobbyViewModel(
         lastCompletedGameId = _activeGameSession.value?.gameId
         _activeGameSession.value = null
         currentStep = 3
+        val lobbyIdToResume = _lobby.value?.lobbyId ?: observedLobbyId
+        if (!lobbyIdToResume.isNullOrBlank()) {
+            viewModelScope.launch {
+                try {
+                    observeLobby(lobbyIdToResume)
+                } catch (error: Exception) {
+                    Log.d(TAG, "Failed to resume lobby observation for $lobbyIdToResume: ${error.message}")
+                }
+            }
+        }
     }
 
     private suspend fun observeLobby(lobbyId: String) {
@@ -288,6 +298,9 @@ class LobbyViewModel(
             playerName = username
         )
         currentStep = 4
+        viewModelScope.launch {
+            pauseLobbyObservationForActiveGame()
+        }
     }
 
     private suspend fun stopLobbyObservers() {
@@ -298,6 +311,12 @@ class LobbyViewModel(
         lobbyUpdatesJob = null
         gameStartJob = null
         lobbyRefreshJob = null
+    }
+
+    private suspend fun pauseLobbyObservationForActiveGame() {
+        Log.d(TAG, "Pausing lobby observers for active game lobby=$observedLobbyId")
+        stopLobbyObservers()
+        repository.disconnect()
     }
 
     private suspend fun clearObservedLobby() {
@@ -318,11 +337,7 @@ class LobbyViewModel(
         val currentLobby = _lobby.value ?: return false
         if (isStartingGame || currentLobby.gameStarted) return false
         if (currentLobby.members.size < 2) return false
-
-        currentLobby.canStart?.let { return it }
-
-        val hostId = currentLobby.hostId
-        return hostId == null || hostId == userId
+        return currentLobby.members.any { it.id == userId }
     }
 
     fun startAvailabilityMessage(): String? {
@@ -333,8 +348,8 @@ class LobbyViewModel(
         if (currentLobby.members.size < 2) {
             return "Mindestens 2 Spieler werden zum Starten benotigt."
         }
-        if (currentLobby.canStart == false || (currentLobby.hostId != null && currentLobby.hostId != userId)) {
-            return "Warte auf den Host, um das Spiel zu starten."
+        if (currentLobby.members.none { it.id == userId }) {
+            return "Warte auf die Lobby-Synchronisierung."
         }
         return null
     }

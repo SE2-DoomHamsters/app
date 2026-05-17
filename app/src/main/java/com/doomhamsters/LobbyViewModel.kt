@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -34,6 +35,10 @@ class LobbyViewModel(
     private val _navigateToGame = MutableSharedFlow<Pair<String, String>>()
     val navigateToGame: SharedFlow<Pair<String, String>> = _navigateToGame
 
+
+    // Steuert die Hintergrund-Updates für die Mitgliederliste und den Spielstart
+    private var lobbyUpdateJob: Job? = null
+
     fun createGroup() {
         if (username.isBlank() || groupName.isBlank()) return
         viewModelScope.launch {
@@ -44,13 +49,15 @@ class LobbyViewModel(
                 val createdLobby = repository.createLobby(groupName, user)
                 _lobby.value = createdLobby
 
-                // Keep lobby state in sync whenever another player joins
-                launch {
-                    repository.subscribeLobbyUpdates(createdLobby.lobbyId)
-                        .collect { updated -> _lobby.value = updated }
-                }
-
-                    // Lauschen auf Spielstart für den Host
+                // Laufende Hintergrund-Updates abbrechen, um doppelte Tasks zu verhindern
+                lobbyUpdateJob?.cancel()
+                lobbyUpdateJob = viewModelScope.launch {
+                    // Mitgliederliste synchronisieren
+                    launch {
+                        repository.subscribeLobbyUpdates(createdLobby.lobbyId)
+                            .collect { updated -> _lobby.value = updated }
+                    }
+                    // Auf Spielstart lauschen für den Host
                     launch {
                         repository.subscribeGameStart(createdLobby.lobbyId)
                             .collect { newGameId ->
@@ -59,6 +66,7 @@ class LobbyViewModel(
                                 currentStep = 4
                             }
                     }
+                }
 
                 currentStep = 3
             } catch (e: Exception) {
@@ -66,6 +74,7 @@ class LobbyViewModel(
             }
         }
     }
+
     fun joinLobby(scannedLobbyId: String) {
         if (username.isBlank()) {
             _error.value = "Bitte gib zuerst deinen Spielernamen ein!"
@@ -83,11 +92,15 @@ class LobbyViewModel(
                 if (joinedLobby != null) {
                     _lobby.value = joinedLobby
 
-                    launch {
-                        repository.subscribeLobbyUpdates(joinedLobby.lobbyId)
-                            .collect { updated -> _lobby.value = updated }
-                    }
-                        // Lauschen auf Spielstart für alle Gäste
+                    // Laufende Hintergrund-Updates abbrechen, um doppelte Tasks zu verhindern
+                    lobbyUpdateJob?.cancel()
+                    lobbyUpdateJob = viewModelScope.launch {
+                        // 1. Mitgliederliste synchronisieren
+                        launch {
+                            repository.subscribeLobbyUpdates(joinedLobby.lobbyId)
+                                .collect { updated -> _lobby.value = updated }
+                        }
+                        // 2. Auf Spielstart lauschen für alle Gäste
                         launch {
                             repository.subscribeGameStart(joinedLobby.lobbyId)
                                 .collect { newGameId ->
@@ -96,6 +109,7 @@ class LobbyViewModel(
                                     currentStep = 4
                                 }
                         }
+                    }
 
                     currentStep = 3
                 } else {
@@ -108,8 +122,24 @@ class LobbyViewModel(
         }
     }
 
-
-
+    fun leaveLobby() {
+        val lobbyId = _lobby.value?.lobbyId
+        viewModelScope.launch {
+            try {
+                if (lobbyId != null) {
+                    repository.leaveLobby(lobbyId, userId)
+                }
+            } catch (_: Exception) {
+                // Netzwerkfehler ignorieren, um das lokale Verlassen der Lobby nicht zu blockieren
+            } finally {
+                // Hintergrund-Updates beenden, Verbindung trennen und UI auf Start zurücksetzen
+                lobbyUpdateJob?.cancel()
+                repository.disconnect()
+                _lobby.value = null
+                currentStep = 1
+            }
+        }
+    }
 
     fun startGame() {
         val currentLobbyId = _lobby.value?.lobbyId ?: return

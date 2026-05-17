@@ -1,6 +1,7 @@
 package com.doomhamsters
 
-import android.content.Intent
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,13 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.doomhamsters.data.decodeBase64ToBitmap
 import com.doomhamsters.ui.theme.DarkBrown
 import com.doomhamsters.ui.theme.DoomHamstersTheme
@@ -177,6 +178,11 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
 fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
     val lobbyState by viewModel.lobby.collectAsState()
 
+    // Die Zurücktaste am Gerät führt zum Verlassen der Lobby
+    BackHandler {
+        viewModel.leaveLobby()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -206,10 +212,21 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
         }
 
         Spacer(modifier = Modifier.weight(1f))
+
         Button(onClick = {
             viewModel.startGame()
         }, modifier = Modifier.fillMaxWidth()) {
             Text("SPIEL STARTEN")
+        }
+
+        Spacer(Modifier.height(8.dp))
+
+        // leave-lobby button
+        OutlinedButton(
+            onClick = { viewModel.leaveLobby() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.leave_lobby_text))
         }
     }
 }
@@ -234,8 +251,6 @@ fun StartScreen(
     modifier: Modifier = Modifier,
     viewModel: LobbyViewModel? = null
 ) {
-    val context = LocalContext.current
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -258,7 +273,7 @@ fun StartScreen(
 
         Spacer(modifier = Modifier.weight(1f))
 
-        // Spiel-start-Button
+        // start-Button
         Button(
             onClick = {
                 // schaltet die Navigation auf den ProfileSetupScreen um!
@@ -366,21 +381,5 @@ fun RulesScreen(modifier: Modifier = Modifier, onBackClick: () -> Unit) {
                 color = SoftWhite
             )
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun StartScreenPreview() {
-    DoomHamstersTheme {
-        StartScreen()
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun RulesPreview() {
-    DoomHamstersTheme {
-        RulesScreen(onBackClick = {})
     }
 }

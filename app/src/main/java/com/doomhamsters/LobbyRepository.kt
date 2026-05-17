@@ -32,6 +32,7 @@ class LobbyRepository(
 
     /** Opens the persistent WebSocket connection used for STOMP subscriptions. */
     suspend fun connect() {
+        if (session != null) return
         session = stompClient.connect("ws://$baseUrl/ws")
     }
 
@@ -61,6 +62,28 @@ class LobbyRepository(
             httpClient.newCall(request).execute().use { response ->
                 check(response.isSuccessful) { "Create lobby failed: ${response.code}" }
                 response.body!!.string().toLobby()
+            }
+        }
+    }
+
+    /**
+     * Leaves a lobby via REST.
+     * * @param lobbyId The ID of the lobby to leave.
+     * @param userId The ID of the player who is leaving.
+     */
+    suspend fun leaveLobby(lobbyId: String, userId: String) {
+        val body = JSONObject().put("userId", userId).toString().toRequestBody("application/json".toMediaType())
+
+        val request = Request.Builder()
+            .url("http://$baseUrl/api/lobby/$lobbyId/leave")
+            .post(body)
+            .build()
+
+        withContext(Dispatchers.IO) {
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    println("Leave lobby failed: ${response.code}")
+                }
             }
         }
     }

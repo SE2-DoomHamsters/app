@@ -11,7 +11,12 @@ data class User(
 data class Lobby(
     val lobbyId: String = "",
     val members: List<User> = emptyList(),
-    val qrCodeBase64: String? = null
+    val qrCodeBase64: String? = null,
+    val gameId: String? = null,
+    val gameStarted: Boolean = false,
+    val hostId: String? = null,
+    val canStart: Boolean? = null,
+    val maxPlayers: Int? = null
 )
 
 //Macht aus dem text vom Server ein echtes Bild

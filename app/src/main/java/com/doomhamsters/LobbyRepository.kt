@@ -1,5 +1,8 @@
 package com.doomhamsters
 
+
+
+import android.util.Log
 import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
 import kotlinx.coroutines.Dispatchers
@@ -28,15 +31,24 @@ class LobbyRepository(
     private val httpClient: OkHttpClient = OkHttpClient(),
     private val stompClient: StompClient = StompClient(OkHttpWebSocketClient())
 ) {
+    private companion object {
+        const val TAG = "LobbyDebug"
+    }
+
     internal var session: StompSession? = null
+
+    fun isConnected(): Boolean = session != null
 
     /** Opens the persistent WebSocket connection used for STOMP subscriptions. */
     suspend fun connect() {
+        if (session != null) return
+        Log.d(TAG, "Opening STOMP session to ws://$baseUrl/ws")
         session = stompClient.connect("ws://$baseUrl/ws")
     }
 
     /** Closes the WebSocket connection. */
     suspend fun disconnect() {
+        Log.d(TAG, "Closing STOMP session")
         session?.disconnect()
         session = null
     }
@@ -60,7 +72,9 @@ class LobbyRepository(
         return withContext(Dispatchers.IO) {
             httpClient.newCall(request).execute().use { response ->
                 check(response.isSuccessful) { "Create lobby failed: ${response.code}" }
-                response.body!!.string().toLobby()
+                response.body!!.string().also { payload ->
+                    Log.d(TAG, "createLobby response: ${payload.toLobbySummary()}")
+                }.toLobby()
             }
         }
     }
@@ -79,7 +93,37 @@ class LobbyRepository(
 
         return withContext(Dispatchers.IO) {
             httpClient.newCall(request).execute().use { response ->
-                if (response.isSuccessful) response.body!!.string().toLobby() else null
+                if (response.isSuccessful) {
+                    response.body!!.string().also { payload ->
+                        Log.d(TAG, "joinLobby response for $lobbyId: ${payload.toLobbySummary()}")
+                    }.toLobby()
+                } else {
+                    Log.d(TAG, "joinLobby failed for $lobbyId with status ${response.code}")
+                    null
+                }
+            }
+        }
+    }
+
+    /**
+     * Fetches the current full lobby snapshot via REST.
+     */
+    suspend fun getLobby(lobbyId: String): Lobby? {
+        val request = Request.Builder()
+            .url("http://$baseUrl/api/lobby/$lobbyId")
+            .get()
+            .build()
+
+        return withContext(Dispatchers.IO) {
+            httpClient.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    response.body!!.string().also { payload ->
+                        Log.d(TAG, "getLobby response for $lobbyId: ${payload.toLobbySummary()}")
+                    }.toLobby()
+                } else {
+                    Log.d(TAG, "getLobby failed for $lobbyId with status ${response.code}")
+                    null
+                }
             }
         }
     }
@@ -91,7 +135,10 @@ class LobbyRepository(
     suspend fun subscribeLobbyUpdates(lobbyId: String): Flow<Lobby> =
         checkNotNull(session) { "Call connect() before subscribing" }
             .subscribeText("/topic/lobby/$lobbyId")
-            .map { it.toLobby() }
+            .map { payload ->
+                Log.d(TAG, "STOMP /topic/lobby/$lobbyId update: ${payload.toLobbySummary()}")
+                payload.toLobby()
+            }
     /**
      * Sagt dem Server, dass das Spiel für diese Lobby gestartet werden soll.
      * Aufruf durch den Host.
@@ -119,6 +166,7 @@ class LobbyRepository(
         checkNotNull(session) { "Call connect() before subscribing" }
             .subscribeText("/topic/game/$lobbyId")
             .map { jsonString ->
+                Log.d(TAG, "STOMP /topic/game/$lobbyId start payload: $jsonString")
                 JSONObject(jsonString).getString("gameId")
             }
 }
@@ -135,10 +183,31 @@ private fun String.toLobby(): Lobby {
     val members = json.optJSONArray("members")?.let { arr ->
         (0 until arr.length()).map { arr.getJSONObject(it).toUser() }
     } ?: emptyList()
+    val parsedGameId = json.optNullableString("gameId")
+        ?: json.optNullableString("currentGameId")
+        ?: json.optNullableString("startedGameId")
+    val hostObject = json.optJSONObject("host")
+    val parsedHostId = json.optNullableString("hostId")
+        ?: json.optNullableString("ownerId")
+        ?: json.optNullableString("createdBy")
+        ?: hostObject?.optNullableString("id")
+        ?: hostObject?.optNullableString("userId")
+    val parsedCanStart = json.optNullableBoolean("canStart")
+        ?: json.optNullableBoolean("startAllowed")
+        ?: json.optNullableBoolean("mayStart")
+    val parsedMaxPlayers = json.optNullableInt("maxPlayers")
+        ?: json.optNullableInt("capacity")
     return Lobby(
         lobbyId = json.getString("lobbyId"),
         members = members,
-        qrCodeBase64 = json.optString("qrCodeBase64").takeIf { it.isNotEmpty() }
+        qrCodeBase64 = json.optString("qrCodeBase64").takeIf { it.isNotEmpty() },
+        gameId = parsedGameId,
+        gameStarted = json.optBoolean("gameStarted") ||
+            json.optBoolean("started") ||
+            !parsedGameId.isNullOrBlank(),
+        hostId = parsedHostId,
+        canStart = parsedCanStart,
+        maxPlayers = parsedMaxPlayers
     )
 }
 
@@ -147,3 +216,23 @@ private fun JSONObject.toUser() = User(
     username = getString("username"),
     avatar = getString("avatar")
 )
+
+private fun JSONObject.optNullableString(key: String): String? =
+    optString(key).takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
+
+private fun JSONObject.optNullableBoolean(key: String): Boolean? =
+    if (has(key) && !isNull(key)) optBoolean(key) else null
+
+private fun JSONObject.optNullableInt(key: String): Int? =
+    optInt(key).takeIf { has(key) && !isNull(key) && it > 0 }
+
+private fun String.toLobbySummary(): String {
+    val json = JSONObject(this)
+    val memberNames = json.optJSONArray("members")?.let { membersArray ->
+        (0 until membersArray.length()).map { index ->
+            membersArray.getJSONObject(index).optString("username", "?")
+        }
+    }.orEmpty()
+    val gameId = json.optString("gameId").ifBlank { json.optString("currentGameId") }
+    return "lobbyId=${json.optString("lobbyId")}, members=${memberNames.size}, names=$memberNames, gameId=${gameId.ifBlank { "null" }}, started=${json.optBoolean("gameStarted") || json.optBoolean("started")}"
+}

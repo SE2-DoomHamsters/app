@@ -1,13 +1,14 @@
 package com.doomhamsters
 
-import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -31,28 +31,38 @@ import com.doomhamsters.ui.theme.WarmAlmond
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.doomhamsters.ui.gameboard.NavGraph
 import com.doomhamsters.viewmodel.GameBoardViewModel
+import com.doomhamsters.viewmodel.GameBoardViewModelFactory
+
+// joining a lobby without QR scanning.
+private const val ENABLE_MANUAL_LOBBY_JOIN = true
 
 @Composable
 fun MainLobbyNavigation(viewModel: LobbyViewModel) {
-    // Hier wird entschieden: Welchen Screen zeigen wir gerade?
-    var activeGameId by remember { mutableStateOf<String?>(null) }
-    var activePlayerId by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
-        viewModel.navigateToGame.collect { (gameId, playerId) ->
-            activeGameId = gameId
-            activePlayerId = playerId
-            //viewModel.currentStep = 4
-        }
-    }
+    val activeGameSession by viewModel.activeGameSession.collectAsState()
+    val lobbyState by viewModel.lobby.collectAsState()
+    val playerAvatars = lobbyState?.members
+        ?.flatMap { member -> listOf(member.id to member.avatar, member.username to member.avatar) }
+        ?.toMap()
+        .orEmpty()
+
     when (viewModel.currentStep) {
         1 -> StartScreen(viewModel = viewModel)
         2 -> ProfileSetupScreen(viewModel)
         3 -> ActiveLobbyScreen(viewModel)
-        4 -> {
-            if (activeGameId != null && activePlayerId != null) {
-                GameBoardScreen(gameId = activeGameId!!, playerId = activePlayerId!!)
-            }
+        4 -> activeGameSession?.let { session ->
+            GameBoardScreen(
+                gameId = session.gameId,
+                playerId = session.playerId,
+                playerName = session.playerName,
+                playerAvatars = playerAvatars,
+                onReturnToLobby = viewModel::returnToLobbyAfterGame
+            )
+        } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
         }
         5 -> RulesScreen(onBackClick = { viewModel.currentStep = 1 })
     }
@@ -60,6 +70,7 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
 
 @Composable
 fun ProfileSetupScreen(viewModel: LobbyViewModel) {
+    var manualLobbyId by rememberSaveable { mutableStateOf("") }
     val scanLauncher = rememberLauncherForActivityResult(
         contract = ScanContract(),
         onResult = { result ->
@@ -73,9 +84,12 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .imePadding()
+            .navigationBarsPadding()
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.CenterVertically)
     ) {
         Text("Lobby erstellen", style = MaterialTheme.typography.headlineMedium)
 
@@ -143,9 +157,11 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
                 .fillMaxWidth()
                 .height(56.dp),
             // Button ist nur klickbar, wenn Name UND Gruppenname ausgefüllt sind
-            enabled = viewModel.username.isNotBlank() && viewModel.groupName.isNotBlank()
+            enabled = viewModel.username.isNotBlank() &&
+                viewModel.groupName.isNotBlank() &&
+                !viewModel.isProfileActionInProgress
         ) {
-            Text("Gruppe erstellen")
+            Text(if (viewModel.isProfileActionInProgress) "Bitte warten..." else "Gruppe erstellen")
         }
         Spacer(Modifier.height(16.dp))
         Text("ODER")
@@ -166,9 +182,34 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            enabled = viewModel.username.isNotBlank()
+            enabled = viewModel.username.isNotBlank() && !viewModel.isProfileActionInProgress
         ) {
             Text("QR-Code scannen & Beitreten")
+        }
+
+        if (ENABLE_MANUAL_LOBBY_JOIN) {
+            Spacer(Modifier.height(16.dp))
+            Text("Testhilfe ohne Kamera")
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = manualLobbyId,
+                onValueChange = { manualLobbyId = it },
+                label = { Text("Lobby ID manuell eingeben") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = { viewModel.joinLobby(manualLobbyId.trim()) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                enabled = viewModel.username.isNotBlank() &&
+                    manualLobbyId.isNotBlank() &&
+                    !viewModel.isProfileActionInProgress
+            ) {
+                Text(if (viewModel.isProfileActionInProgress) "Bitte warten..." else "Mit Lobby ID beitreten")
+            }
         }
     }
 }
@@ -176,6 +217,8 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
 @Composable
 fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
     val lobbyState by viewModel.lobby.collectAsState()
+    val startAvailabilityMessage = viewModel.startAvailabilityMessage()
+    val canStartGame = viewModel.canCurrentUserStartGame()
 
     Column(
         modifier = Modifier
@@ -199,6 +242,9 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
 
         Spacer(Modifier.height(24.dp))
         Text("Spieler bereit: ${lobbyState?.members?.size ?: 0}")
+        lobbyState?.maxPlayers?.let { maxPlayers ->
+            Text("Maximale Spieler: $maxPlayers")
+        }
 
         // Liste der Spieler
         lobbyState?.members?.forEach { member ->
@@ -206,26 +252,44 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
         }
 
         Spacer(modifier = Modifier.weight(1f))
+        if (startAvailabilityMessage != null) {
+            Text(
+                text = startAvailabilityMessage,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(12.dp))
+        }
         Button(onClick = {
             viewModel.startGame()
-        }, modifier = Modifier.fillMaxWidth()) {
-            Text("SPIEL STARTEN")
+        }, modifier = Modifier.fillMaxWidth(), enabled = canStartGame) {
+            Text(if (viewModel.isStartingGame) "STARTE SPIEL..." else "SPIEL STARTEN")
         }
     }
 }
 
 @Composable
-fun GameBoardScreen(gameId: String, playerId: String) {
-    val viewModel = remember { GameBoardViewModel(gameId, playerId) }
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "GAMEBOARD",
-            style = MaterialTheme.typography.headlineLarge
+fun GameBoardScreen(
+    gameId: String,
+    playerId: String,
+    playerName: String,
+    playerAvatars: Map<String, String> = emptyMap(),
+    onReturnToLobby: () -> Unit
+) {
+    val gameBoardViewModel: GameBoardViewModel = viewModel(
+        key = "game-$gameId-player-$playerId",
+        factory = GameBoardViewModelFactory(
+            gameId = gameId,
+            playerId = playerId,
+            playerName = playerName,
+            repository = GameRepository(BackendConfig.BASE_URL)
         )
-    }
+    )
+
+    NavGraph(
+        viewModel = gameBoardViewModel,
+        playerAvatars = playerAvatars,
+        onReturnToLobby = onReturnToLobby
+    )
 }
 
 
@@ -234,8 +298,6 @@ fun StartScreen(
     modifier: Modifier = Modifier,
     viewModel: LobbyViewModel? = null
 ) {
-    val context = LocalContext.current
-
     Column(
         modifier = modifier
             .fillMaxSize()

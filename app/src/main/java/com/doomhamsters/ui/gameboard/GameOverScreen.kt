@@ -1,5 +1,6 @@
 package com.doomhamsters.ui.gameboard
 
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
@@ -19,7 +20,7 @@ fun GameOverScreen(winnerId: String, onRestart: () -> Unit) {
         Text("Winner: $winnerId")
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onRestart) {
-            Text("Play Again")
+            Text("Back to Lobby")
         }
     }
 }

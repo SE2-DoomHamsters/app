@@ -1,5 +1,6 @@
 package com.doomhamsters
 
+import android.util.Log
 import com.doomhamsters.data.User
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -8,6 +9,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.test.runTest
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
@@ -20,6 +22,7 @@ import org.hildan.krossbow.stomp.StompClient
 import org.hildan.krossbow.stomp.StompSession
 import org.hildan.krossbow.stomp.subscribeText
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -44,7 +47,14 @@ class LobbyRepositoryTest {
         mockStompClient = mockk()
         mockSession = mockk(relaxed = true)
         mockCall = mockk()
+        mockkStatic(Log::class)
+        every { Log.d(any(), any()) } returns 0
         repository = LobbyRepository("localhost:8080", mockHttpClient, mockStompClient)
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    fun tearDown() {
+        unmockkStatic(Log::class)
     }
 
     @Test
@@ -78,16 +88,31 @@ class LobbyRepositoryTest {
     fun `triggerGameStart sends post request to correct url`() = runTest {
         stubHttpResponse(200, "")
 
-        repository.triggerGameStart("TEST_LOBBY")
+        repository.triggerGameStart("TEST_LOBBY", "u1")
 
         coVerify {
             mockHttpClient.newCall(match { request ->
                 val url = request.url.toString()
                 url.contains("/api/game/start") &&
                     url.contains("lobbyId=TEST_LOBBY") &&
+                    url.contains("userId=u1") &&
                     request.method == "POST"
             })
         }
+    }
+
+    @Test
+    fun `joinLobby throws backend error when join is rejected`() = runTest {
+        stubHttpResponse(409, """{"error":"Game already started"}""")
+
+        val error = try {
+            repository.joinLobby("TEST", testUser)
+            fail("Expected joinLobby to throw")
+        } catch (error: IllegalStateException) {
+            error
+        }
+
+        assertEquals("Game already started", error.message)
     }
 
     @Test

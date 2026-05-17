@@ -1,11 +1,16 @@
 package com.doomhamsters.ui.gameboard
 
+
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,7 +32,14 @@ import androidx.compose.ui.unit.sp
 import com.doomhamsters.ui.theme.*
 
 @Composable
-fun TooltipBubble(title: String, description: String, modifier: Modifier = Modifier) {
+fun TooltipBubble(
+    title: String,
+    description: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    actionEnabled: Boolean = true,
+    onAction: (() -> Unit)? = null
+) {
     var isVisible by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { isVisible = true }
 
@@ -73,6 +85,34 @@ fun TooltipBubble(title: String, description: String, modifier: Modifier = Modif
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(text = title, color = CardDarkMaroon, fontWeight = FontWeight.Black, fontSize = 12.sp)
             Text(text = description, color = CardDarkMaroon, fontWeight = FontWeight.Bold, fontSize = 9.sp, textAlign = TextAlign.Center, lineHeight = 10.sp)
+            if (actionLabel != null && onAction != null) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp)
+                        .background(
+                            if (actionEnabled) AccentOrange else OutlineDark.copy(alpha = 0.45f),
+                            RoundedCornerShape(999.dp)
+                        )
+                        .then(
+                            if (actionEnabled) {
+                                Modifier.clickable { onAction() }
+                            } else {
+                                Modifier
+                            }
+                        )
+                        .padding(vertical = 6.dp, horizontal = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = actionLabel,
+                        color = BackgroundCream,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 10.sp,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
         }
     }
 }

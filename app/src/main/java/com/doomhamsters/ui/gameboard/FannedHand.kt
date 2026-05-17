@@ -1,7 +1,12 @@
 package com.doomhamsters.ui.gameboard
 
+
+
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import com.doomhamsters.cards.CardRegistry
+import com.doomhamsters.cards.cardDescription
+import com.doomhamsters.cards.displayName
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
@@ -25,33 +30,35 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.doomhamsters.model.Card
-import com.doomhamsters.model.CardType
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.sin
 
 private const val piF = PI.toFloat()
-
-fun getCardDescription(type: CardType): String {
-    return when (type) {
-        CardType.Doom -> "Lose 1 life.\nDiscard Snack Stash to defuse."
-        CardType.SnackStash -> "Defuses one Doom card.\nKeep it safe!"
-        CardType.Normal -> "Just a regular card.\nNothing to see here."
-    }
-}
+private val CardWidth = 100.dp
+private val CardHeight = 150.dp
+private val TooltipContainerWidth = 112.dp
+private val TooltipContainerHeight = 260.dp
+private data class DrawAnimationSpec(
+    val cardIndex: Int,
+    val startOffset: Offset
+)
 
 private data class FannedHandState(
     val isOpponent: Boolean,
     val selectedIndex: Int,
     val targetCenterIndex: Int,
     val smoothCenter: Float,
-    val animatingCardIndex: Int
+    val drawAnimation: DrawAnimationSpec?
 )
 
 @Composable
@@ -59,9 +66,16 @@ fun FannedHand(
     cards: List<Card>,
     isOpponent: Boolean,
     selectedIndex: Int,
-    animatingCardIndex: Int = -1,
+    disableDefocus: Boolean = false,
+    suppressTooltip: Boolean = false,
+    interactionEnabled: Boolean = true,
+    drawAnimation: Pair<Int, Offset>? = null,
     drawProgress: () -> Float = { 1f },
-    onCardSelected: (Int) -> Unit = {}
+    canActivateCard: (Card) -> Boolean = { false },
+    modifier: Modifier = Modifier,
+    onCenterMeasured: ((Offset) -> Unit)? = null,
+    onCardSelected: (Int) -> Unit = {},
+    onCardActivated: (Card) -> Unit = {}
 ) {
     if (cards.isEmpty()) return
 
@@ -96,8 +110,23 @@ fun FannedHand(
     val containerModifier = Modifier
         .fillMaxWidth()
         .height(240.dp)
+        .then(modifier)
         .then(
-            if (isOpponent) Modifier else Modifier.draggable(
+            if (onCenterMeasured != null) {
+                Modifier.onGloballyPositioned { coordinates ->
+                    val position = coordinates.positionInRoot()
+                    val center = position + Offset(
+                        x = coordinates.size.width / 2f,
+                        y = coordinates.size.height / 2f
+                    )
+                    onCenterMeasured(center)
+                }
+            } else {
+                Modifier
+            }
+        )
+        .then(
+            if (isOpponent || !interactionEnabled) Modifier else Modifier.draggable(
                 state = draggableState,
                 orientation = Orientation.Horizontal,
                 onDragStopped = { dragAccumulator = 0f }
@@ -109,7 +138,9 @@ fun FannedHand(
         selectedIndex = selectedIndex,
         targetCenterIndex = targetCenterIndex,
         smoothCenter = smoothCenterIndexState.value,
-        animatingCardIndex = animatingCardIndex
+        drawAnimation = drawAnimation?.let { (cardIndex, startOffset) ->
+            DrawAnimationSpec(cardIndex = cardIndex, startOffset = startOffset)
+        }
     )
 
     Box(
@@ -121,11 +152,16 @@ fun FannedHand(
                 card = card,
                 index = i,
                 state = handState,
+                disableDefocus = disableDefocus,
+                suppressTooltip = suppressTooltip,
+                interactionEnabled = interactionEnabled,
                 drawProgress = drawProgress,
+                canActivateCard = canActivateCard,
                 onCardSelected = {
                     targetCenterIndex = i
                     onCardSelected(i)
-                }
+                },
+                onCardActivated = onCardActivated
             )
         }
     }
@@ -136,13 +172,18 @@ private fun FannedCard(
     card: Card,
     index: Int,
     state: FannedHandState,
+    disableDefocus: Boolean,
+    suppressTooltip: Boolean,
+    interactionEnabled: Boolean,
     drawProgress: () -> Float,
-    onCardSelected: () -> Unit
+    canActivateCard: (Card) -> Boolean,
+    onCardSelected: () -> Unit,
+    onCardActivated: (Card) -> Unit
 ) {
     val isSelected = index == state.selectedIndex
     val isCenter = index == state.targetCenterIndex
-    val isAnimating = index == state.animatingCardIndex
-    val isDefocused = !state.isOpponent && !isCenter
+    val isAnimating = index == state.drawAnimation?.cardIndex
+    val isDefocused = !disableDefocus && !state.isOpponent && !isCenter
 
     val staticAbsOffset = abs(index - state.targetCenterIndex)
 
@@ -166,24 +207,25 @@ private fun FannedCard(
                 smoothCenter = state.smoothCenter,
                 isOpponent = state.isOpponent,
                 isAnimating = isAnimating,
+                animationStartOffset = state.drawAnimation?.startOffset,
                 selectionLift = selectionLiftState.value,
                 progress = currentProgress()
             )
             translationX = trans.x
             translationY = trans.y
         }
-        .size(100.dp, 150.dp)
+        .size(TooltipContainerWidth, TooltipContainerHeight)
 
     val origin = if (state.isOpponent) TransformOrigin(0.5f, -0.2f) else TransformOrigin(0.5f, 1.2f)
 
-    val clickableModifier = if (!state.isOpponent && !isAnimating) {
+    val clickableModifier = if (!state.isOpponent && !isAnimating && interactionEnabled) {
         Modifier.clickable { onCardSelected() }
     } else {
         Modifier
     }
 
     val cardScaleModifier = Modifier
-        .fillMaxSize()
+        .size(CardWidth, CardHeight)
         .graphicsLayer {
             val transform = getCardTransform(
                 index = index,
@@ -205,7 +247,11 @@ private fun FannedCard(
     }
 
     Box(modifier = translationModifier) {
-        Box(modifier = cardScaleModifier) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .then(cardScaleModifier)
+        ) {
             CardContent(
                 card = card,
                 state = state,
@@ -216,7 +262,15 @@ private fun FannedCard(
                 dynamicShadowOffset = dynamicShadowOffset
             )
         }
-        CardTooltip(card, state, isSelected, isAnimating)
+        CardTooltip(
+            card = card,
+            state = state,
+            isSelected = isSelected,
+            isAnimating = isAnimating,
+            suppressTooltip = suppressTooltip,
+            canActivateCard = canActivateCard,
+            onCardActivated = onCardActivated
+        )
     }
 }
 
@@ -246,16 +300,26 @@ private fun BoxScope.CardTooltip(
     card: Card,
     state: FannedHandState,
     isSelected: Boolean,
-    isAnimating: Boolean
+    isAnimating: Boolean,
+    suppressTooltip: Boolean,
+    canActivateCard: (Card) -> Boolean,
+    onCardActivated: (Card) -> Unit
 ) {
-    if (!state.isOpponent && isSelected && !isAnimating) {
+    if (!state.isOpponent && isSelected && !isAnimating && !suppressTooltip) {
+        val definition = CardRegistry.definitionFor(card)
         TooltipBubble(
-            title = card.type.name,
-            description = getCardDescription(card.type),
+            title = card.displayName(),
+            description = card.cardDescription(),
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = (-105).dp)
-                .requiredWidth(96.dp)
+                .requiredWidth(TooltipContainerWidth),
+            actionLabel = if (definition.command != null) "Activate card" else null,
+            actionEnabled = canActivateCard(card),
+            onAction = if (definition.command != null) {
+                { onCardActivated(card) }
+            } else {
+                null
+            }
         )
     }
 }
@@ -311,6 +375,7 @@ private fun getCardTranslation(
     smoothCenter: Float,
     isOpponent: Boolean,
     isAnimating: Boolean,
+    animationStartOffset: Offset?,
     selectionLift: Float,
     progress: Float
 ): CardTranslation {
@@ -323,12 +388,13 @@ private fun getCardTranslation(
 
     if (!isAnimating) return CardTranslation(finalX, finalY)
 
-    val slideFraction = (progress / 0.3f).coerceIn(0f, 1f)
-    val flyFraction = ((progress - 0.3f) / 0.7f).coerceIn(0f, 1f)
-    val arcY = sin(flyFraction * piF) * -150f
+    val startOffset = animationStartOffset ?: Offset(140f, -480f)
+    val flyFraction = progress.coerceIn(0f, 1f)
+    val arcDirection = if (isOpponent) 1f else -1f
+    val arcY = sin(flyFraction * piF) * 80f * arcDirection
 
-    val transX = (slideFraction * 140f) + (finalX - (slideFraction * 140f)) * flyFraction
-    val transY = (-480f + (slideFraction * 20f)) + (finalY - (-480f + (slideFraction * 20f))) * flyFraction + arcY
+    val transX = startOffset.x + (finalX - startOffset.x) * flyFraction
+    val transY = startOffset.y + (finalY - startOffset.y) * flyFraction + arcY
 
     return CardTranslation(transX, transY)
 }

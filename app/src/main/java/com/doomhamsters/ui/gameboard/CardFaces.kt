@@ -2,6 +2,7 @@ package com.doomhamsters.ui.gameboard
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import com.doomhamsters.cards.displayName
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,6 +56,8 @@ fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: 
     val (bgColor, innerBorderColor, textColor) = when (card.type) {
         CardType.Doom -> Triple(DoomColor, Color(0xFFC94A4A), BackgroundCream)
         CardType.SnackStash -> Triple(SnackStashColor, Color(0xFFA3C968), CardDarkMaroon)
+        CardType.PowerNap -> Triple(Color(0xFFB8D8E8), Color(0xFF6A9FB5), CardDarkMaroon)
+        CardType.QuickPeek -> Triple(Color(0xFFF8E7A2), Color(0xFFD6A93A), CardDarkMaroon)
         CardType.Normal -> Triple(BackgroundCream, AccentOrange, CardDarkMaroon)
     }
 
@@ -86,7 +89,7 @@ fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: 
         ) {
             Box(modifier = Modifier.fillMaxSize().padding(8.dp)) {
                 Text(
-                    text = card.type.name.replace("S", "\nS"),
+                    text = card.displayName().replace(" ", "\n"),
                     color = textColor,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,

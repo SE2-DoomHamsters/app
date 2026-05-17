@@ -16,11 +16,15 @@ import androidx.compose.ui.unit.dp
 import com.doomhamsters.ui.theme.*
 
 @Composable
-fun DrawDeck(deckSize: Int, onClick: () -> Unit) {
+fun DrawDeck(
+    deckSize: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     val displaySize = minOf(deckSize, 8)
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier
+        modifier = modifier
             .size(140.dp, 190.dp)
             .clickable { onClick() }
     ) {

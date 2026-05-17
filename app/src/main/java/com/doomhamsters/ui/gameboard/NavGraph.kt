@@ -15,6 +15,7 @@ import com.doomhamsters.viewmodel.GameBoardViewModel
 fun NavGraph(
     viewModel: GameBoardViewModel,
     playerAvatars: Map<String, String> = emptyMap(),
+    playerNames: Map<String, String> = emptyMap(),
     onReturnToLobby: () -> Unit
 ) {
     val navController = rememberNavController()
@@ -24,6 +25,7 @@ fun NavGraph(
             GameBoard(
                 viewModel = viewModel,
                 playerAvatars = playerAvatars,
+                playerNames = playerNames,
                 onGameOver = { winnerId -> navController.navigate("gameover/$winnerId") }
             )
         }
@@ -35,8 +37,14 @@ fun NavGraph(
                 kotlinx.coroutines.delay(2500)
                 onReturnToLobby()
             }
+            val winnerId = backStackEntry.arguments?.getString("winnerId") ?: "Unknown"
             GameOverScreen(
-                winnerId = backStackEntry.arguments?.getString("winnerId") ?: "Unknown",
+                winnerId = winnerId,
+                winnerName = resolvePlayerDisplayName(
+                    playerId = winnerId,
+                    fallbackName = winnerId,
+                    playerNames = playerNames
+                ),
                 onRestart = onReturnToLobby
             )
         }

@@ -10,14 +10,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun GameOverScreen(winnerId: String, onRestart: () -> Unit) {
+fun GameOverScreen(
+    winnerId: String,
+    winnerName: String = winnerId,
+    onRestart: () -> Unit
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text("Game Over!")
-        Text("Winner: $winnerId")
+        Text("Winner: $winnerName")
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = onRestart) {
             Text("Back to Lobby")

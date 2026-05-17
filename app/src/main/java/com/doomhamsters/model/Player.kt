@@ -31,10 +31,12 @@ class Player(
         fun fromJson(json: JSONObject): Player {
             val playerId = if (json.has("playerId")) json.getString("playerId") else json.getString("id")
             val handArray = json.optJSONArray("hand") ?: JSONArray()
+            val rawName = json.optString("playerName")
+                .ifBlank { json.optString("name") }
             val p = Player(
                 id = playerId,
                 lives = json.getInt("lives"),
-                name = json.optString("playerName").ifBlank { playerId },
+                name = displayName(rawName, playerId),
                 avatar = json.optString("avatar")
                     .ifBlank { json.optString("playerAvatar") },
                 aliveFlag = json.optBoolean("alive").takeIf { json.has("alive") },
@@ -44,6 +46,18 @@ class Player(
                 p.hand.add(Card.fromJson(handArray.getJSONObject(i)))
             }
             return p
+        }
+
+        private fun displayName(rawName: String, playerId: String): String {
+            val normalizedName = rawName.trim()
+            if (normalizedName.isNotBlank() && normalizedName != playerId) {
+                return normalizedName
+            }
+            return if (playerId.length > 12 || playerId.contains('-')) {
+                "Player ${playerId.takeLast(4)}"
+            } else {
+                playerId
+            }
         }
     }
 }

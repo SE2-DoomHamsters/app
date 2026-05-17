@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.ui.Modifier
+import com.doomhamsters.ui.lobby.MainLobbyNavigation
 import com.doomhamsters.ui.theme.DoomHamstersTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 

@@ -126,8 +126,7 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
         Spacer(Modifier.height(20.dp))
 
         // 3.EMOJIS
-        Text("WÃ¤hle dein Spieler-Icon:")
-
+        Text("Wähle dein Spieler-Icon:")
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(
             modifier = Modifier
@@ -136,7 +135,7 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
             horizontalArrangement = Arrangement.Center,
             maxItemsInEachRow = 4
         ) {
-            val icons = listOf("ðŸ±", "ðŸ¶", "ðŸ·", "ðŸ¦Š", "ðŸ¤–", "ðŸ‘½", "ðŸ­")
+            val icons = listOf("🐱", "🐶", "🐷", "🦊", "🤖", "👽", "🐭")
             icons.forEach { emoji ->
                 val isSelected = viewModel.selectedAvatar == emoji
                 Box(

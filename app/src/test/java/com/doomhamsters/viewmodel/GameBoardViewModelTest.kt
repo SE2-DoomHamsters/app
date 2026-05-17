@@ -1,13 +1,18 @@
 package com.doomhamsters.viewmodel
 
+import android.util.Log
 import com.doomhamsters.GameRepository
 import com.doomhamsters.model.GameState
 import com.doomhamsters.model.Player
 import com.doomhamsters.model.Status
 import io.mockk.Runs
 import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -28,14 +33,20 @@ class GameBoardViewModelTest {
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        mockkStatic(Log::class)
+        every { Log.d(any(), any()) } returns 0
+        every { Log.e(any(), any(), any()) } returns 0
+        every { Log.e(any(), any()) } returns 0
         repository = mockk(relaxed = true)
         coEvery { repository.connect() } just Runs
         coEvery { repository.subscribeToGame("game-1") } returns emptyFlow()
         coEvery { repository.subscribeToGameState("game-1") } returns emptyFlow()
+        coEvery { repository.subscribeToPrivateEvents("game-1", any()) } returns emptyFlow()
     }
 
     @AfterEach
     fun tearDown() {
+        unmockkStatic(Log::class)
         Dispatchers.resetMain()
     }
 
@@ -105,6 +116,32 @@ class GameBoardViewModelTest {
         advanceUntilIdle()
 
         assertEquals("client-temp", viewModel.localPlayerId)
+    }
+
+    @Test
+    fun `retries initial connection before surfacing failure`() = runTest {
+        val state = gameState(
+            players = arrayListOf(
+                Player(id = "player-1", lives = 3, name = "Alex"),
+                Player(id = "player-2", lives = 3, name = "Remote")
+            )
+        )
+        coEvery { repository.connect() } throws RuntimeException("timeout") andThen Unit
+        coEvery { repository.disconnect() } just Runs
+        coEvery { repository.fetchGameState("game-1", "player-1") } returns state
+        coEvery { repository.subscribeToPrivateEvents("game-1", "player-1") } returns emptyFlow()
+
+        val viewModel = GameBoardViewModel(
+            gameId = "game-1",
+            initialLocalPlayerId = "player-1",
+            localPlayerName = "Alex",
+            repository = repository
+        )
+        advanceUntilIdle()
+
+        assertEquals("player-1", viewModel.localPlayerId)
+        coVerify(exactly = 2) { repository.connect() }
+        coVerify(exactly = 1) { repository.disconnect() }
     }
 
     private fun gameState(players: ArrayList<Player>): GameState =

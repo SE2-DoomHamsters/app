@@ -32,6 +32,10 @@ open class GameBoardViewModel(
     val localPlayerName: String,
     private val repository: GameRepository
 ) : ViewModel() {
+    private companion object {
+        val initialConnectionRetryDelaysMs = listOf(0L, 500L, 1_000L, 2_000L)
+    }
+
     private val tag = "GameBoardViewModel"
 
     var localPlayerId: String = initialLocalPlayerId
@@ -81,11 +85,12 @@ open class GameBoardViewModel(
 
     private fun connectAndObserveRemoteState() {
         viewModelScope.launch {
-            try {
-                Log.d(tag, "Connecting gameId=$gameId localPlayerId=$localPlayerId localPlayerName=$localPlayerName")
-                repository.connect()
-                refreshGameState(resolvePlayerId = true)
+            val connected = establishInitialConnection()
+            if (!connected) {
+                return@launch
+            }
 
+            try {
                 launch {
                     repository.subscribeToGameState(gameId)
                         .catch { e ->
@@ -127,6 +132,39 @@ open class GameBoardViewModel(
                 _error.emit("Connection error: ${e.message}")
             }
         }
+    }
+
+    private suspend fun establishInitialConnection(): Boolean {
+        var lastError: Exception? = null
+
+        for ((attemptIndex, retryDelayMs) in initialConnectionRetryDelaysMs.withIndex()) {
+            if (retryDelayMs > 0) {
+                delay(retryDelayMs)
+            }
+
+            try {
+                Log.d(
+                    tag,
+                    "Connecting attempt=${attemptIndex + 1}/${initialConnectionRetryDelaysMs.size} gameId=$gameId localPlayerId=$localPlayerId localPlayerName=$localPlayerName"
+                )
+                repository.connect()
+                refreshGameState(resolvePlayerId = true)
+                return true
+            } catch (e: Exception) {
+                lastError = e
+                Log.e(
+                    tag,
+                    "Connection attempt failed attempt=${attemptIndex + 1}/${initialConnectionRetryDelaysMs.size} gameId=$gameId",
+                    e
+                )
+                runCatching { repository.disconnect() }
+            }
+        }
+
+        val finalError = lastError ?: IllegalStateException("Unknown connection error")
+        Log.e(tag, "Connection error gameId=$gameId", finalError)
+        _error.emit("Connection error: ${finalError.message}")
+        return false
     }
 
     private fun handlePublicGameEvent(event: JSONObject) {

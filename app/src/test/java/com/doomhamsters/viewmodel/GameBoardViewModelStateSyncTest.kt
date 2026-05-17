@@ -2,6 +2,7 @@ package com.doomhamsters.viewmodel
 
 
 
+import android.util.Log
 import com.doomhamsters.GameRepository
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
@@ -33,6 +34,10 @@ class GameBoardViewModelStateSyncTest {
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        mockkStatic(Log::class)
+        every { Log.d(any(), any()) } returns 0
+        every { Log.e(any(), any(), any()) } returns 0
+        every { Log.e(any(), any()) } returns 0
         repository = mockk(relaxed = true)
         gameStateFlow = MutableSharedFlow()
         coEvery { repository.subscribeToGame("game-1") } returns emptyFlow()
@@ -40,6 +45,7 @@ class GameBoardViewModelStateSyncTest {
 
     @AfterEach
     fun tearDown() {
+        unmockkStatic(Log::class)
         Dispatchers.resetMain()
     }
 

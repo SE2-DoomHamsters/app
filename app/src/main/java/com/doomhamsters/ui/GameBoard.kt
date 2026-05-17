@@ -34,6 +34,7 @@ import kotlinx.coroutines.launch
 fun GameBoard(
     viewModel: GameBoardViewModel,
     playerAvatars: Map<String, String> = emptyMap(),
+    playerNames: Map<String, String> = emptyMap(),
     onGameOver: (String) -> Unit
 ) {
     val gameState by viewModel.gameState.collectAsState()
@@ -108,6 +109,39 @@ fun GameBoard(
 
     val topOpponent = state.players.firstOrNull { it.id == lastActiveOpponentId && it.id != localPlayer.id }
         ?: fallbackOpponent
+    val currentTurnPlayerName = resolvePlayerDisplayName(
+        playerId = currentTurnPlayer.id,
+        fallbackName = currentTurnPlayer.name,
+        playerNames = playerNames
+    )
+    val localPlayerName = resolvePlayerDisplayName(
+        playerId = localPlayer.id,
+        fallbackName = localPlayer.name,
+        playerNames = playerNames
+    )
+    val topOpponentName = topOpponent?.let { opponent ->
+        resolvePlayerDisplayName(
+            playerId = opponent.id,
+            fallbackName = opponent.name,
+            playerNames = playerNames
+        )
+    }
+    val pausedRemotePlayerName = pausedForDoomPlayerName
+        ?.let { rawName ->
+            state.players.firstOrNull { player ->
+                resolvePlayerDisplayName(
+                    playerId = player.id,
+                    fallbackName = player.name,
+                    playerNames = playerNames
+                ) == rawName || player.name == rawName || player.id == rawName
+            }?.let { matchedPlayer ->
+                resolvePlayerDisplayName(
+                    playerId = matchedPlayer.id,
+                    fallbackName = matchedPlayer.name,
+                    playerNames = playerNames
+                )
+            } ?: rawName
+        }
     val opponentVisibleHandSize = topOpponent?.visibleHandSize() ?: 0
     val isResolvingLocalDoom =
         pendingDoom != null ||
@@ -211,7 +245,7 @@ fun GameBoard(
                 CenterPlayArea(
                     deckSize = state.deckSize,
                     isLocalPlayersTurn = isLocalPlayersTurn,
-                    currentTurnPlayerName = currentTurnPlayer.name,
+                    currentTurnPlayerName = currentTurnPlayerName,
                     visibleTurns = visibleTurns,
                     playerAvatars = playerAvatars,
                     onDrawClick = handleDraw,
@@ -231,6 +265,7 @@ fun GameBoard(
         ) {
             OpponentArea(
                 opponent = topOpponent,
+                opponentName = topOpponentName,
                 drawAnimation = opponentAnimatingCardIndex.takeIf { it >= 0 }?.let { index ->
                     index to (opponentDrawStartOffset ?: Offset.Zero)
                 },
@@ -282,7 +317,7 @@ fun GameBoard(
             pausedForDoomDetail != null
         ) {
             RemoteDoomPauseOverlay(
-                playerName = pausedForDoomPlayerName!!,
+                playerName = pausedRemotePlayerName ?: pausedForDoomPlayerName!!,
                 message = pausedForDoomMessage!!,
                 detail = pausedForDoomDetail!!
             )
@@ -302,6 +337,7 @@ fun GameBoard(
         ) {
             PlayerArea(
                 currentPlayer = localPlayer,
+                currentPlayerName = localPlayerName,
                 selectedPlayerCardIndex = selectedPlayerCardIndex,
                 disableDefocus = pendingDoomRequiresSelection,
                 suppressTooltip = isResolvingLocalDoom,
@@ -350,6 +386,7 @@ private fun GameBoardStatus(message: String) {
 @Composable
 private fun OpponentArea(
     opponent: Player?,
+    opponentName: String?,
     drawAnimation: Pair<Int, Offset>?,
     drawProgress: () -> Float,
     onHandCenterMeasured: (Offset) -> Unit
@@ -379,7 +416,7 @@ private fun OpponentArea(
             )
         }
         PlayerLabel(
-            name = opponent.name,
+            name = opponentName ?: opponent.name,
             lives = opponent.lives,
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -486,6 +523,7 @@ private fun BoxScope.DecorativeSideBorders() {
 @Composable
 private fun PlayerArea(
     currentPlayer: Player,
+    currentPlayerName: String,
     selectedPlayerCardIndex: Int,
     disableDefocus: Boolean,
     suppressTooltip: Boolean,
@@ -535,7 +573,7 @@ private fun PlayerArea(
         }
 
         PlayerLabel(
-            name = currentPlayer.name,
+            name = currentPlayerName,
             lives = currentPlayer.lives,
             modifier = Modifier.padding(bottom = 8.dp).zIndex(200f)
         )

@@ -1,5 +1,6 @@
-package com.doomhamsters
+package com.doomhamsters.ui.lobby
 
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -22,20 +24,22 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.doomhamsters.BackendConfig
+import com.doomhamsters.GameRepository
+import com.doomhamsters.LobbyViewModel
+import com.doomhamsters.R
 import com.doomhamsters.data.decodeBase64ToBitmap
+import com.doomhamsters.ui.gameboard.NavGraph
 import com.doomhamsters.ui.theme.DarkBrown
 import com.doomhamsters.ui.theme.DoomHamstersTheme
 import com.doomhamsters.ui.theme.Orange
 import com.doomhamsters.ui.theme.SoftWhite
 import com.doomhamsters.ui.theme.WarmAlmond
-import com.journeyapps.barcodescanner.ScanContract
-import com.journeyapps.barcodescanner.ScanOptions
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.doomhamsters.ui.gameboard.NavGraph
 import com.doomhamsters.viewmodel.GameBoardViewModel
 import com.doomhamsters.viewmodel.GameBoardViewModelFactory
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 
 // joining a lobby without QR scanning.
 private const val ENABLE_MANUAL_LOBBY_JOIN = true
@@ -48,6 +52,9 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
         ?.flatMap { member -> listOf(member.id to member.avatar, member.username to member.avatar) }
         ?.toMap()
         .orEmpty()
+    val playerNames = lobbyState?.members
+        ?.associate { member -> member.id to member.username }
+        .orEmpty()
 
     when (viewModel.currentStep) {
         1 -> StartScreen(viewModel = viewModel)
@@ -59,6 +66,7 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
                 playerId = session.playerId,
                 playerName = session.playerName,
                 playerAvatars = playerAvatars,
+                playerNames = playerNames,
                 onReturnToLobby = viewModel::returnToLobbyAfterGame
             )
         } ?: Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -91,7 +99,7 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(0.dp, Alignment.CenterVertically)
     ) {
-        Text("Lobby erstellen", style = MaterialTheme.typography.headlineMedium)
+        Text("Lobby erstellen oder beitreten", style = MaterialTheme.typography.headlineMedium)
 
         Spacer(Modifier.height(20.dp))
 
@@ -118,7 +126,7 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
         Spacer(Modifier.height(20.dp))
 
         // 3.EMOJIS
-        Text("Wähle dein Spieler-Icon:")
+        Text("WÃ¤hle dein Spieler-Icon:")
 
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(
@@ -128,7 +136,7 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
             horizontalArrangement = Arrangement.Center,
             maxItemsInEachRow = 4
         ) {
-            val icons = listOf("🐱", "🐶", "🐷", "🦊", "🤖", "👽", "🐭")
+            val icons = listOf("ðŸ±", "ðŸ¶", "ðŸ·", "ðŸ¦Š", "ðŸ¤–", "ðŸ‘½", "ðŸ­")
             icons.forEach { emoji ->
                 val isSelected = viewModel.selectedAvatar == emoji
                 Box(
@@ -156,7 +164,7 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
-            // Button ist nur klickbar, wenn Name UND Gruppenname ausgefüllt sind
+            // Button ist nur klickbar, wenn Name UND Gruppenname ausgefÃ¼llt sind
             enabled = viewModel.username.isNotBlank() &&
                 viewModel.groupName.isNotBlank() &&
                 !viewModel.isProfileActionInProgress
@@ -241,10 +249,7 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
         }
 
         Spacer(Modifier.height(24.dp))
-        Text("Spieler bereit: ${lobbyState?.members?.size ?: 0}")
-        lobbyState?.maxPlayers?.let { maxPlayers ->
-            Text("Maximale Spieler: $maxPlayers")
-        }
+        Text("Spieler in der Lobby: ${lobbyState?.members?.size ?: 0}")
 
         // Liste der Spieler
         lobbyState?.members?.forEach { member ->
@@ -262,7 +267,7 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
         Button(onClick = {
             viewModel.startGame()
         }, modifier = Modifier.fillMaxWidth(), enabled = canStartGame) {
-            Text(if (viewModel.isStartingGame) "STARTE SPIEL..." else "SPIEL STARTEN")
+            Text(if (viewModel.isStartingGame) "STARTE SPIEL..." else "Spiel fur alle starten")
         }
     }
 }
@@ -273,6 +278,7 @@ fun GameBoardScreen(
     playerId: String,
     playerName: String,
     playerAvatars: Map<String, String> = emptyMap(),
+    playerNames: Map<String, String> = emptyMap(),
     onReturnToLobby: () -> Unit
 ) {
     val gameBoardViewModel: GameBoardViewModel = viewModel(
@@ -288,6 +294,7 @@ fun GameBoardScreen(
     NavGraph(
         viewModel = gameBoardViewModel,
         playerAvatars = playerAvatars,
+        playerNames = playerNames,
         onReturnToLobby = onReturnToLobby
     )
 }
@@ -391,7 +398,7 @@ fun RulesScreen(modifier: Modifier = Modifier, onBackClick: () -> Unit) {
 
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color.White.copy(alpha = 0.5f), // Dein 80% Weiß
+            color = Color.White.copy(alpha = 0.5f), // Dein 80% WeiÃŸ
             modifier = Modifier
                 .fillMaxWidth()
                 .shadow(elevation = 1.dp, shape = RoundedCornerShape(16.dp))

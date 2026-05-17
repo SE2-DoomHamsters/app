@@ -15,12 +15,19 @@ import org.hildan.krossbow.stomp.sendText
 import org.hildan.krossbow.stomp.subscribeText
 import org.hildan.krossbow.websocket.okhttp.OkHttpWebSocketClient
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 
 class GameRepository(
     private val baseUrl: String,
     private val httpClient: OkHttpClient = OkHttpClient(),
-    private val stompClient: StompClient = StompClient(OkHttpWebSocketClient())
+    private val stompClient: StompClient = StompClient(
+        OkHttpWebSocketClient(
+            OkHttpClient.Builder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .build()
+        )
+    )
 ) {
     private val tag = "GameRepository"
     internal var session: StompSession? = null

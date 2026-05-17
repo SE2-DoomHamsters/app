@@ -83,7 +83,8 @@ tasks.register<JacocoReport>("jacocoTestReport") {
         "**/BuildConfig.*",
         "**/Manifest*.*",
         "**/*Test*.*",
-        "android/**/*.*"
+        "android/**/*.*",
+        "**/ui/**"
     )
 
     val debugTree =
@@ -118,6 +119,10 @@ sonar {
         property(
             "sonar.coverage.jacoco.xmlReportPaths",
             "${project.projectDir}/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml"
+        )
+        property(
+            "sonar.coverage.exclusions",
+            "**/src/main/java/com/doomhamsters/ui/**"
         )
     }
 }

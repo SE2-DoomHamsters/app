@@ -32,7 +32,13 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 import androidx.activity.compose.rememberLauncherForActivityResult
 import com.doomhamsters.viewmodel.GameBoardViewModel
-
+/**
+ * Das zentrale Navigations-Relais für die Lobby-Phase.
+ * Lauscht auf den [LobbyViewModel.navigateToGame] Flow und schaltet automatisch
+ * auf das GameBoard um (Step 4), sobald die IDs vom Server eintreffen.
+ *
+ * @param viewModel Das geteilte [LobbyViewModel] für das State-Management.
+ */
 @Composable
 fun MainLobbyNavigation(viewModel: LobbyViewModel) {
     // Hier wird entschieden: Welchen Screen zeigen wir gerade?
@@ -57,7 +63,11 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
         5 -> RulesScreen(onBackClick = { viewModel.currentStep = 1 })
     }
 }
-
+/**
+ * Der Screen für die Profilerstellung. Enthält das Textfeld für den Namen,
+ * die Avatar-Auswahl sowie den **QR-Code-Scanner-Launcher**, um via Kamera
+ * einer bestehenden Lobby beizutreten.
+ */
 @Composable
 fun ProfileSetupScreen(viewModel: LobbyViewModel) {
     val scanLauncher = rememberLauncherForActivityResult(
@@ -172,7 +182,11 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
         }
     }
 }
-
+/**
+ * Der Warteraum vor dem Spiel. Zeigt die aktuelle Lobby-ID, den generierten QR-Code
+ * für andere Mitspieler sowie die Liste aller beigetretenen Spieler in Echtzeit an.
+ * Bietet dem Host den Button zum Starten des Spiels.
+ */
 @Composable
 fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
     val lobbyState by viewModel.lobby.collectAsState()
@@ -213,7 +227,13 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
         }
     }
 }
-
+/**
+ * Der Ziel-Screen nach dem erfolgreichen Spielstart.
+ * Initialisiert das [GameBoardViewModel] mit den vom Server empfangenen IDs.
+ *
+ * @param gameId Die eindeutige ID des gestarteten Spiels.
+ * @param playerId Die ID des aktuellen Spielers in diesem Spiel.
+ */
 @Composable
 fun GameBoardScreen(gameId: String, playerId: String) {
     val viewModel = remember { GameBoardViewModel(gameId, playerId) }

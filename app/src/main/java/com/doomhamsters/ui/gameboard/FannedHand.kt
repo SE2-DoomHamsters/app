@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableFloatState
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -61,45 +63,52 @@ private data class FannedHandState(
     val drawAnimation: DrawAnimationSpec?
 )
 
+data class FannedHandUiConfig(
+    val isOpponent: Boolean,
+    val selectedIndex: Int,
+    val disableDefocus: Boolean = false,
+    val suppressTooltip: Boolean = false,
+    val interactionEnabled: Boolean = true,
+    val modifier: Modifier = Modifier,
+    val onCenterMeasured: ((Offset) -> Unit)? = null
+)
+
+data class FannedHandAnimationConfig(
+    val drawAnimation: Pair<Int, Offset>? = null,
+    val drawProgress: () -> Float = { 1f }
+)
+
+data class FannedHandCallbacks(
+    val canActivateCard: (Card) -> Boolean = { false },
+    val onCardSelected: (Int) -> Unit = {},
+    val onCardActivated: (Card) -> Unit = {}
+)
+
 @Composable
 fun FannedHand(
     cards: List<Card>,
-    isOpponent: Boolean,
-    selectedIndex: Int,
-    disableDefocus: Boolean = false,
-    suppressTooltip: Boolean = false,
-    interactionEnabled: Boolean = true,
-    drawAnimation: Pair<Int, Offset>? = null,
-    drawProgress: () -> Float = { 1f },
-    canActivateCard: (Card) -> Boolean = { false },
-    modifier: Modifier = Modifier,
-    onCenterMeasured: ((Offset) -> Unit)? = null,
-    onCardSelected: (Int) -> Unit = {},
-    onCardActivated: (Card) -> Unit = {}
+    uiConfig: FannedHandUiConfig,
+    animationConfig: FannedHandAnimationConfig = FannedHandAnimationConfig(),
+    callbacks: FannedHandCallbacks = FannedHandCallbacks()
 ) {
     if (cards.isEmpty()) return
 
-    var targetCenterIndex by remember(cards.size) { mutableIntStateOf((cards.size - 1) / 2) }
+    val targetCenterIndexState = remember(cards.size) { mutableIntStateOf((cards.size - 1) / 2) }
+    val dragAccumulatorState = remember { mutableFloatStateOf(0f) }
+    val targetCenterIndex by targetCenterIndexState
 
-    LaunchedEffect(selectedIndex) {
-        if (selectedIndex in cards.indices && !isOpponent) {
-            targetCenterIndex = selectedIndex
-        }
-    }
+    SyncTargetCenterIndex(
+        selectedIndex = uiConfig.selectedIndex,
+        cardIndices = cards.indices,
+        isOpponent = uiConfig.isOpponent,
+        targetCenterIndexState = targetCenterIndexState
+    )
 
-    var dragAccumulator by remember { mutableFloatStateOf(0f) }
-    val dragThreshold = 50f
-
-    val draggableState = rememberDraggableState { delta ->
-        dragAccumulator += delta
-        if (dragAccumulator > dragThreshold) {
-            if (targetCenterIndex > 0) targetCenterIndex--
-            dragAccumulator = 0f
-        } else if (dragAccumulator < -dragThreshold) {
-            if (targetCenterIndex < cards.size - 1) targetCenterIndex++
-            dragAccumulator = 0f
-        }
-    }
+    val draggableState = rememberTargetCenterDraggableState(
+        cardCount = cards.size,
+        targetCenterIndexState = targetCenterIndexState,
+        dragAccumulatorState = dragAccumulatorState
+    )
 
     val smoothCenterIndexState = animateFloatAsState(
         targetValue = targetCenterIndex.toFloat(),
@@ -107,38 +116,18 @@ fun FannedHand(
         label = "smoothCenter"
     )
 
-    val containerModifier = Modifier
-        .fillMaxWidth()
-        .height(240.dp)
-        .then(modifier)
-        .then(
-            if (onCenterMeasured != null) {
-                Modifier.onGloballyPositioned { coordinates ->
-                    val position = coordinates.positionInRoot()
-                    val center = position + Offset(
-                        x = coordinates.size.width / 2f,
-                        y = coordinates.size.height / 2f
-                    )
-                    onCenterMeasured(center)
-                }
-            } else {
-                Modifier
-            }
-        )
-        .then(
-            if (isOpponent || !interactionEnabled) Modifier else Modifier.draggable(
-                state = draggableState,
-                orientation = Orientation.Horizontal,
-                onDragStopped = { dragAccumulator = 0f }
-            )
-        )
+    val containerModifier = rememberContainerModifier(
+        uiConfig = uiConfig,
+        draggableState = draggableState,
+        dragAccumulatorState = dragAccumulatorState
+    )
 
     val handState = FannedHandState(
-        isOpponent = isOpponent,
-        selectedIndex = selectedIndex,
+        isOpponent = uiConfig.isOpponent,
+        selectedIndex = uiConfig.selectedIndex,
         targetCenterIndex = targetCenterIndex,
         smoothCenter = smoothCenterIndexState.value,
-        drawAnimation = drawAnimation?.let { (cardIndex, startOffset) ->
+        drawAnimation = animationConfig.drawAnimation?.let { (cardIndex, startOffset) ->
             DrawAnimationSpec(cardIndex = cardIndex, startOffset = startOffset)
         }
     )
@@ -152,19 +141,115 @@ fun FannedHand(
                 card = card,
                 index = i,
                 state = handState,
-                disableDefocus = disableDefocus,
-                suppressTooltip = suppressTooltip,
-                interactionEnabled = interactionEnabled,
-                drawProgress = drawProgress,
-                canActivateCard = canActivateCard,
-                onCardSelected = {
-                    targetCenterIndex = i
-                    onCardSelected(i)
-                },
-                onCardActivated = onCardActivated
+                uiConfig = uiConfig,
+                animationConfig = animationConfig,
+                callbacks = withCenteredSelection(callbacks, targetCenterIndexState)
             )
         }
     }
+}
+
+@Composable
+private fun SyncTargetCenterIndex(
+    selectedIndex: Int,
+    cardIndices: IntRange,
+    isOpponent: Boolean,
+    targetCenterIndexState: MutableIntState
+) {
+    LaunchedEffect(selectedIndex) {
+        if (selectedIndex in cardIndices && !isOpponent) {
+            targetCenterIndexState.intValue = selectedIndex
+        }
+    }
+}
+
+@Composable
+private fun rememberTargetCenterDraggableState(
+    cardCount: Int,
+    targetCenterIndexState: MutableIntState,
+    dragAccumulatorState: MutableFloatState
+) = rememberDraggableState { delta ->
+    dragAccumulatorState.floatValue += delta
+    updateTargetCenterFromDrag(
+        cardCount = cardCount,
+        targetCenterIndexState = targetCenterIndexState,
+        dragAccumulatorState = dragAccumulatorState
+    )
+}
+
+private fun updateTargetCenterFromDrag(
+    cardCount: Int,
+    targetCenterIndexState: MutableIntState,
+    dragAccumulatorState: MutableFloatState
+) {
+    val dragThreshold = 50f
+    val targetCenterIndex = targetCenterIndexState.intValue
+    val dragAccumulator = dragAccumulatorState.floatValue
+    when {
+        dragAccumulator > dragThreshold && targetCenterIndex > 0 -> {
+            targetCenterIndexState.intValue = targetCenterIndex - 1
+            dragAccumulatorState.floatValue = 0f
+        }
+
+        dragAccumulator < -dragThreshold && targetCenterIndex < cardCount - 1 -> {
+            targetCenterIndexState.intValue = targetCenterIndex + 1
+            dragAccumulatorState.floatValue = 0f
+        }
+    }
+}
+
+private fun rememberContainerModifier(
+    uiConfig: FannedHandUiConfig,
+    draggableState: androidx.compose.foundation.gestures.DraggableState,
+    dragAccumulatorState: MutableFloatState
+): Modifier {
+    return Modifier
+        .fillMaxWidth()
+        .height(240.dp)
+        .then(uiConfig.modifier)
+        .then(centerMeasurementModifier(uiConfig.onCenterMeasured))
+        .then(interactionModifier(uiConfig, draggableState, dragAccumulatorState))
+}
+
+private fun centerMeasurementModifier(
+    onCenterMeasured: ((Offset) -> Unit)?
+): Modifier {
+    return onCenterMeasured?.let { callback ->
+        Modifier.onGloballyPositioned { coordinates ->
+            val position = coordinates.positionInRoot()
+            val center = position + Offset(
+                x = coordinates.size.width / 2f,
+                y = coordinates.size.height / 2f
+            )
+            callback(center)
+        }
+    } ?: Modifier
+}
+
+private fun interactionModifier(
+    uiConfig: FannedHandUiConfig,
+    draggableState: androidx.compose.foundation.gestures.DraggableState,
+    dragAccumulatorState: MutableFloatState
+): Modifier {
+    if (uiConfig.isOpponent || !uiConfig.interactionEnabled) return Modifier
+
+    return Modifier.draggable(
+        state = draggableState,
+        orientation = Orientation.Horizontal,
+        onDragStopped = { dragAccumulatorState.floatValue = 0f }
+    )
+}
+
+private fun withCenteredSelection(
+    callbacks: FannedHandCallbacks,
+    targetCenterIndexState: MutableIntState
+): FannedHandCallbacks {
+    return callbacks.copy(
+        onCardSelected = { selectedIndex ->
+            targetCenterIndexState.intValue = selectedIndex
+            callbacks.onCardSelected(selectedIndex)
+        }
+    )
 }
 
 @Composable
@@ -172,18 +257,14 @@ private fun FannedCard(
     card: Card,
     index: Int,
     state: FannedHandState,
-    disableDefocus: Boolean,
-    suppressTooltip: Boolean,
-    interactionEnabled: Boolean,
-    drawProgress: () -> Float,
-    canActivateCard: (Card) -> Boolean,
-    onCardSelected: () -> Unit,
-    onCardActivated: (Card) -> Unit
+    uiConfig: FannedHandUiConfig,
+    animationConfig: FannedHandAnimationConfig,
+    callbacks: FannedHandCallbacks
 ) {
     val isSelected = index == state.selectedIndex
     val isCenter = index == state.targetCenterIndex
     val isAnimating = index == state.drawAnimation?.cardIndex
-    val isDefocused = !disableDefocus && !state.isOpponent && !isCenter
+    val isDefocused = !uiConfig.disableDefocus && !state.isOpponent && !isCenter
 
     val staticAbsOffset = abs(index - state.targetCenterIndex)
 
@@ -193,9 +274,7 @@ private fun FannedCard(
         label = "lift"
     )
 
-    val currentProgress: () -> Float = {
-        if (isAnimating) drawProgress() else 1f
-    }
+    val currentProgress = if (isAnimating) animationConfig.drawProgress() else 1f
 
     val zIndexValue = getCardZIndex(isSelected, isAnimating, staticAbsOffset)
 
@@ -209,7 +288,7 @@ private fun FannedCard(
                 isAnimating = isAnimating,
                 animationStartOffset = state.drawAnimation?.startOffset,
                 selectionLift = selectionLiftState.value,
-                progress = currentProgress()
+                progress = currentProgress
             )
             translationX = trans.x
             translationY = trans.y
@@ -218,8 +297,8 @@ private fun FannedCard(
 
     val origin = if (state.isOpponent) TransformOrigin(0.5f, -0.2f) else TransformOrigin(0.5f, 1.2f)
 
-    val clickableModifier = if (!state.isOpponent && !isAnimating && interactionEnabled) {
-        Modifier.clickable { onCardSelected() }
+    val clickableModifier = if (!state.isOpponent && !isAnimating && uiConfig.interactionEnabled) {
+        Modifier.clickable { callbacks.onCardSelected(index) }
     } else {
         Modifier
     }
@@ -232,7 +311,7 @@ private fun FannedCard(
                 smoothCenter = state.smoothCenter,
                 isOpponent = state.isOpponent,
                 isAnimating = isAnimating,
-                progress = currentProgress()
+                progress = currentProgress
             )
             rotationZ = transform.rotationZ
             scaleX = transform.scale
@@ -243,7 +322,7 @@ private fun FannedCard(
         .then(clickableModifier)
 
     val dynamicShadowOffset: () -> Float = {
-        getCardShadow(index, state.smoothCenter, isAnimating, currentProgress())
+        getCardShadow(index, state.smoothCenter, isAnimating, currentProgress)
     }
 
     Box(modifier = translationModifier) {
@@ -258,7 +337,7 @@ private fun FannedCard(
                 isSelected = isSelected,
                 isDefocused = isDefocused,
                 isAnimating = isAnimating,
-                drawProgress = drawProgress,
+                drawProgress = currentProgress,
                 dynamicShadowOffset = dynamicShadowOffset
             )
         }
@@ -267,9 +346,9 @@ private fun FannedCard(
             state = state,
             isSelected = isSelected,
             isAnimating = isAnimating,
-            suppressTooltip = suppressTooltip,
-            canActivateCard = canActivateCard,
-            onCardActivated = onCardActivated
+            suppressTooltip = uiConfig.suppressTooltip,
+            canActivateCard = callbacks.canActivateCard,
+            onCardActivated = callbacks.onCardActivated
         )
     }
 }
@@ -281,7 +360,7 @@ private fun CardContent(
     isSelected: Boolean,
     isDefocused: Boolean,
     isAnimating: Boolean,
-    drawProgress: () -> Float,
+    drawProgress: Float,
     dynamicShadowOffset: () -> Float
 ) {
     if (state.isOpponent) {
@@ -335,12 +414,12 @@ private fun AnimatedCardFaces(
     card: Card,
     isSelected: Boolean,
     isDefocused: Boolean,
-    drawProgress: () -> Float,
+    drawProgress: Float,
     dynamicShadowOffset: () -> Float
 ) {
     CardFaceDown(
         modifier = Modifier.graphicsLayer {
-            val rotY = 180f * (1f - ((drawProgress() - 0.3f) / 0.7f).coerceIn(0f, 1f))
+            val rotY = 180f * (1f - ((drawProgress - 0.3f) / 0.7f).coerceIn(0f, 1f))
             alpha = if (rotY > 90f) 1f else 0f
             rotationY = 180f
         },
@@ -351,7 +430,7 @@ private fun AnimatedCardFaces(
         isSelected = isSelected,
         isDefocused = isDefocused,
         modifier = Modifier.graphicsLayer {
-            val rotY = 180f * (1f - ((drawProgress() - 0.3f) / 0.7f).coerceIn(0f, 1f))
+            val rotY = 180f * (1f - ((drawProgress - 0.3f) / 0.7f).coerceIn(0f, 1f))
             alpha = if (rotY <= 90f) 1f else 0f
         },
         shadowOffset = dynamicShadowOffset
@@ -360,8 +439,11 @@ private fun AnimatedCardFaces(
         modifier = Modifier
             .fillMaxSize()
             .graphicsLayer {
-                val progress = drawProgress()
-                alpha = if (progress in 0.5f..0.8f) sin((progress - 0.5f) / 0.3f * piF) else 0f
+                alpha = if (drawProgress in 0.5f..0.8f) {
+                    sin((drawProgress - 0.5f) / 0.3f * piF)
+                } else {
+                    0f
+                }
             }
             .background(Color.White, RoundedCornerShape(8.dp))
     )

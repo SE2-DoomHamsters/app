@@ -2,6 +2,7 @@ package com.doomhamsters.ui
 
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import com.doomhamsters.ui.gameboard.*
 import com.doomhamsters.ui.theme.*
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -24,11 +25,83 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.doomhamsters.cards.CardCommandNotice
 import com.doomhamsters.model.Card
+import com.doomhamsters.model.GameState
 import com.doomhamsters.model.CardType
 import com.doomhamsters.model.Player
 import com.doomhamsters.viewmodel.GameBoardViewModel
 import kotlinx.coroutines.launch
+
+private sealed interface GameBoardResolution {
+    data class Ready(
+        val state: GameState,
+        val currentTurnPlayer: Player,
+        val localPlayer: Player
+    ) : GameBoardResolution
+
+    data class Status(val message: String) : GameBoardResolution
+}
+
+private data class BoardOverlayState(
+    val pendingDoom: Card?,
+    val pendingDoomMessage: String?,
+    val pendingDoomRequiresSelection: Boolean,
+    val pendingDoomRequiresInsertionUi: Boolean,
+    val pausedRemotePlayerName: String?,
+    val pausedForDoomPlayerName: String?,
+    val pausedForDoomMessage: String?,
+    val pausedForDoomDetail: String?,
+    val cardCommandNotice: CardCommandNotice?
+)
+
+private data class BoardOverlayContext(
+    val currentPlayer: Player,
+    val deckSize: Int,
+    val selectedPlayerCardIndex: Int,
+    val doomSliderPosition: Float
+)
+
+private data class BoardOverlayCallbacks(
+    val onDoomSliderChange: (Float) -> Unit,
+    val onDoomConfirmed: () -> Unit,
+    val onDoomDismiss: () -> Unit,
+    val onCardCommandDismiss: () -> Unit
+)
+
+private data class HandDrawState(
+    val localAnimatingCardIndex: Int,
+    val opponentAnimatingCardIndex: Int,
+    val isAnimatingLocalDraw: Boolean,
+    val progress: Float
+)
+
+private data class PlayerAreaContent(
+    val player: Player,
+    val playerName: String,
+    val handUiConfig: FannedHandUiConfig,
+    val handAnimationConfig: FannedHandAnimationConfig,
+    val handCallbacks: FannedHandCallbacks
+)
+
+private data class LocalPlayerAreaInputs(
+    val player: Player,
+    val playerName: String,
+    val selectedPlayerCardIndex: Int,
+    val pendingDoomRequiresSelection: Boolean,
+    val isResolvingLocalDoom: Boolean,
+    val isLifeLossDoomOverlay: Boolean,
+    val localAnimatingCardIndex: Int,
+    val localDrawStartOffset: Offset?,
+    val drawProgress: Float
+)
+
+private data class LocalPlayerAreaCallbacks(
+    val onHandCenterMeasured: (Offset) -> Unit,
+    val canActivateCard: (Card) -> Boolean,
+    val onCardSelectionToggle: (Int) -> Unit,
+    val onCardActivated: (Card) -> Unit
+)
 
 @Composable
 fun GameBoard(
@@ -54,12 +127,6 @@ fun GameBoard(
     var deckCenter by remember { mutableStateOf<Offset?>(null) }
     var localHandCenter by remember { mutableStateOf<Offset?>(null) }
     var opponentHandCenter by remember { mutableStateOf<Offset?>(null) }
-    var localAnimatingCardIndex by remember { mutableIntStateOf(-1) }
-    var opponentAnimatingCardIndex by remember { mutableIntStateOf(-1) }
-
-    val drawAnimatable = remember { Animatable(0f) }
-    var isAnimatingLocalDraw by remember { mutableStateOf(false) }
-    var isAnimatingOpponentDraw by remember { mutableStateOf(false) }
 
     LaunchedEffect(viewModel) {
         launch {
@@ -70,293 +137,469 @@ fun GameBoard(
         }
     }
 
-    val state = gameState
-    if (state == null) {
-        GameBoardStatus(
-            message = latestError ?: "Waiting for game state from server..."
+    when (
+        val resolution = resolveGameBoardResolution(
+            gameState = gameState,
+            latestError = latestError,
+            localPlayerId = viewModel.localPlayerId
         )
-        return
-    }
+    ) {
+        is GameBoardResolution.Status -> {
+            GameBoardStatus(resolution.message)
+            return
+        }
 
-    val currentTurnPlayer = state.players.firstOrNull { it.id == state.currentTurnPlayerId }
-        ?: state.players.getOrNull(state.currentPlayerIndex)
-    if (currentTurnPlayer == null) {
-        GameBoardStatus("Game state is invalid: current player is missing.")
-        return
-    }
+        is GameBoardResolution.Ready -> {
+            val state = resolution.state
+            val currentTurnPlayer = resolution.currentTurnPlayer
+            val localPlayer = resolution.localPlayer
 
-    val localPlayer = state.players.firstOrNull { it.id == viewModel.localPlayerId }
-    if (localPlayer == null) {
-        GameBoardStatus(
-            latestError ?: "Joined game, but player '${viewModel.localPlayerId}' is missing from game state."
-        )
-        return
-    }
+            val topOpponent = rememberTopOpponent(
+                players = state.players,
+                localPlayerId = localPlayer.id,
+                currentTurnPlayerId = currentTurnPlayer.id
+            )
+            val currentTurnPlayerName = resolvePlayerDisplayName(
+                playerId = currentTurnPlayer.id,
+                fallbackName = currentTurnPlayer.name,
+                playerNames = playerNames
+            )
+            val localPlayerName = resolvePlayerDisplayName(
+                playerId = localPlayer.id,
+                fallbackName = localPlayer.name,
+                playerNames = playerNames
+            )
+            val topOpponentName = topOpponent?.let { opponent ->
+                resolvePlayerDisplayName(
+                    playerId = opponent.id,
+                    fallbackName = opponent.name,
+                    playerNames = playerNames
+                )
+            }
+            val pausedRemotePlayerName = resolvePausedRemotePlayerName(
+                rawName = pausedForDoomPlayerName,
+                players = state.players,
+                playerNames = playerNames
+            )
+            val opponentVisibleHandSize = topOpponent?.visibleHandSize() ?: 0
+            val isResolvingLocalDoom =
+                pendingDoom != null ||
+                    state.resolvingDoomPlayerId == viewModel.localPlayerId
+            val isLifeLossDoomOverlay =
+                pendingDoom != null &&
+                    !pendingDoomRequiresSelection &&
+                    !pendingDoomRequiresInsertionUi
 
-    val fallbackOpponent = state.players.firstOrNull { it.id != localPlayer.id }
-    val activeOpponent = currentTurnPlayer.takeIf { it.id != localPlayer.id }
-    var lastActiveOpponentId by remember(localPlayer.id) { mutableStateOf<String?>(null) }
+            ResetDoomInteractionState(
+                isResolvingLocalDoom = isResolvingLocalDoom,
+                pendingDoomRequiresSelection = pendingDoomRequiresSelection,
+                onResetSelection = { selectedPlayerCardIndex = -1 },
+                onResetSlider = { doomSliderPosition = 0f }
+            )
 
-    LaunchedEffect(activeOpponent?.id, fallbackOpponent?.id, state.players.size) {
-        when {
-            activeOpponent != null -> lastActiveOpponentId = activeOpponent.id
-            lastActiveOpponentId == null -> lastActiveOpponentId = fallbackOpponent?.id
-            state.players.none { it.id == lastActiveOpponentId && it.id != localPlayer.id } -> {
-                lastActiveOpponentId = fallbackOpponent?.id
+            val handDrawState = rememberHandDrawState(
+                localPlayerId = localPlayer.id,
+                localHandSize = localPlayer.hand.size,
+                opponentId = topOpponent?.id,
+                opponentVisibleHandSize = opponentVisibleHandSize
+            )
+
+            val visibleTurns = buildVisibleTurnOrder(
+                players = state.players,
+                currentTurnPlayerId = state.currentTurnPlayerId,
+                currentPlayerIndex = state.currentPlayerIndex
+            )
+            val localDrawStartOffset = remember(deckCenter, localHandCenter) {
+                offsetBetween(deckCenter, localHandCenter)
+            }
+            val opponentDrawStartOffset = remember(deckCenter, opponentHandCenter) {
+                offsetBetween(opponentHandCenter, deckCenter)
+            }
+            val handleDraw = createDrawHandler(
+                isLocalPlayersTurn = isLocalPlayersTurn,
+                isAnimatingLocalDraw = handDrawState.isAnimatingLocalDraw,
+                deckSize = state.deckSize,
+                isResolvingLocalDoom = isResolvingLocalDoom,
+                localPlayerId = localPlayer.id,
+                onResetSelection = { selectedPlayerCardIndex = -1 },
+                onDraw = viewModel::draw
+            )
+            val overlayState = BoardOverlayState(
+                pendingDoom = pendingDoom,
+                pendingDoomMessage = pendingDoomMessage,
+                pendingDoomRequiresSelection = pendingDoomRequiresSelection,
+                pendingDoomRequiresInsertionUi = pendingDoomRequiresInsertionUi,
+                pausedRemotePlayerName = pausedRemotePlayerName,
+                pausedForDoomPlayerName = pausedForDoomPlayerName,
+                pausedForDoomMessage = pausedForDoomMessage,
+                pausedForDoomDetail = pausedForDoomDetail,
+                cardCommandNotice = cardCommandNotice
+            )
+            val localPlayerAreaContent = buildLocalPlayerAreaContent(
+                inputs = LocalPlayerAreaInputs(
+                    player = localPlayer,
+                    playerName = localPlayerName,
+                    selectedPlayerCardIndex = selectedPlayerCardIndex,
+                    pendingDoomRequiresSelection = pendingDoomRequiresSelection,
+                    isResolvingLocalDoom = isResolvingLocalDoom,
+                    isLifeLossDoomOverlay = isLifeLossDoomOverlay,
+                    localAnimatingCardIndex = handDrawState.localAnimatingCardIndex,
+                    localDrawStartOffset = localDrawStartOffset,
+                    drawProgress = handDrawState.progress
+                ),
+                callbacks = LocalPlayerAreaCallbacks(
+                    onHandCenterMeasured = { localHandCenter = it },
+                    canActivateCard = viewModel::canActivateCard,
+                    onCardSelectionToggle = { index ->
+                        selectedPlayerCardIndex = if (selectedPlayerCardIndex == index) -1 else index
+                    },
+                    onCardActivated = { card ->
+                        selectedPlayerCardIndex = -1
+                        viewModel.activateCard(card)
+                    }
+                )
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BackgroundCream)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(modifier = Modifier.weight(0.8f))
+
+                    Box(
+                        modifier = Modifier.weight(1.7f).fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CenterPlayArea(
+                            deckSize = state.deckSize,
+                            isLocalPlayersTurn = isLocalPlayersTurn,
+                            currentTurnPlayerName = currentTurnPlayerName,
+                            visibleTurns = visibleTurns,
+                            playerAvatars = playerAvatars,
+                            onDrawClick = handleDraw,
+                            onDeckCenterMeasured = { deckCenter = it }
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1.5f))
+                }
+
+                DecorativeSideBorders()
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(3f),
+                    contentAlignment = Alignment.TopCenter
+                ) {
+                    OpponentArea(
+                        opponent = topOpponent,
+                        opponentName = topOpponentName,
+                        drawAnimation = handDrawState.opponentAnimatingCardIndex.takeIf { it >= 0 }?.let { index ->
+                            index to (opponentDrawStartOffset ?: Offset.Zero)
+                        },
+                        drawProgress = { handDrawState.progress },
+                        onHandCenterMeasured = { opponentHandCenter = it }
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsTopHeight(WindowInsets.statusBars)
+                        .background(BackgroundCream)
+                        .zIndex(4f)
+                        .align(Alignment.TopCenter)
+                )
+
+                BoardOverlays(
+                    overlayState = overlayState,
+                    context = BoardOverlayContext(
+                        currentPlayer = localPlayer,
+                        deckSize = state.deckSize,
+                        selectedPlayerCardIndex = selectedPlayerCardIndex,
+                        doomSliderPosition = doomSliderPosition
+                    ),
+                    callbacks = BoardOverlayCallbacks(
+                        onDoomSliderChange = { doomSliderPosition = it },
+                        onDoomConfirmed = {
+                            viewModel.insertDoom(doomSliderPosition.toInt())
+                            doomSliderPosition = 0f
+                            selectedPlayerCardIndex = -1
+                        },
+                        onDoomDismiss = { viewModel.dismissDoomNotice(selectedPlayerCardIndex) },
+                        onCardCommandDismiss = viewModel::dismissCardCommandNotice
+                    )
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(if (pendingDoomRequiresSelection) 7f else 0f)
+                ) {
+                    PlayerArea(content = localPlayerAreaContent)
+                }
             }
         }
     }
+}
 
-    val topOpponent = state.players.firstOrNull { it.id == lastActiveOpponentId && it.id != localPlayer.id }
-        ?: fallbackOpponent
-    val currentTurnPlayerName = resolvePlayerDisplayName(
-        playerId = currentTurnPlayer.id,
-        fallbackName = currentTurnPlayer.name,
-        playerNames = playerNames
-    )
-    val localPlayerName = resolvePlayerDisplayName(
-        playerId = localPlayer.id,
-        fallbackName = localPlayer.name,
-        playerNames = playerNames
-    )
-    val topOpponentName = topOpponent?.let { opponent ->
-        resolvePlayerDisplayName(
-            playerId = opponent.id,
-            fallbackName = opponent.name,
-            playerNames = playerNames
-        )
+private fun resolveGameBoardResolution(
+    gameState: GameState?,
+    latestError: String?,
+    localPlayerId: String
+): GameBoardResolution {
+    if (gameState == null) {
+        return GameBoardResolution.Status(latestError ?: "Waiting for game state from server...")
     }
-    val pausedRemotePlayerName = pausedForDoomPlayerName
-        ?.let { rawName ->
-            state.players.firstOrNull { player ->
-                resolvePlayerDisplayName(
-                    playerId = player.id,
-                    fallbackName = player.name,
-                    playerNames = playerNames
-                ) == rawName || player.name == rawName || player.id == rawName
-            }?.let { matchedPlayer ->
-                resolvePlayerDisplayName(
-                    playerId = matchedPlayer.id,
-                    fallbackName = matchedPlayer.name,
-                    playerNames = playerNames
-                )
-            } ?: rawName
-        }
-    val opponentVisibleHandSize = topOpponent?.visibleHandSize() ?: 0
-    val isResolvingLocalDoom =
-        pendingDoom != null ||
-            state.resolvingDoomPlayerId == viewModel.localPlayerId
-    val isLifeLossDoomOverlay =
-        pendingDoom != null &&
-            !pendingDoomRequiresSelection &&
-            !pendingDoomRequiresInsertionUi
 
+    val currentTurnPlayer = gameState.players.firstOrNull { it.id == gameState.currentTurnPlayerId }
+        ?: gameState.players.getOrNull(gameState.currentPlayerIndex)
+        ?: return GameBoardResolution.Status("Game state is invalid: current player is missing.")
+
+    val localPlayer = gameState.players.firstOrNull { it.id == localPlayerId }
+        ?: return GameBoardResolution.Status(
+            latestError ?: "Joined game, but player '$localPlayerId' is missing from game state."
+        )
+
+    return GameBoardResolution.Ready(
+        state = gameState,
+        currentTurnPlayer = currentTurnPlayer,
+        localPlayer = localPlayer
+    )
+}
+
+private fun offsetBetween(from: Offset?, to: Offset?): Offset? {
+    return if (from != null && to != null) from - to else null
+}
+
+private fun createDrawHandler(
+    isLocalPlayersTurn: Boolean,
+    isAnimatingLocalDraw: Boolean,
+    deckSize: Int,
+    isResolvingLocalDoom: Boolean,
+    localPlayerId: String,
+    onResetSelection: () -> Unit,
+    onDraw: (String) -> Unit
+): () -> Unit {
+    return {
+        if (isLocalPlayersTurn && !isAnimatingLocalDraw && deckSize > 0 && !isResolvingLocalDoom) {
+            onResetSelection()
+            onDraw(localPlayerId)
+        }
+    }
+}
+
+private fun buildLocalPlayerAreaContent(
+    inputs: LocalPlayerAreaInputs,
+    callbacks: LocalPlayerAreaCallbacks
+): PlayerAreaContent {
+    return PlayerAreaContent(
+        player = inputs.player,
+        playerName = inputs.playerName,
+        handUiConfig = FannedHandUiConfig(
+            isOpponent = false,
+            selectedIndex = inputs.selectedPlayerCardIndex,
+            disableDefocus = inputs.pendingDoomRequiresSelection,
+            suppressTooltip = inputs.isResolvingLocalDoom,
+            interactionEnabled = !inputs.isLifeLossDoomOverlay,
+            onCenterMeasured = callbacks.onHandCenterMeasured
+        ),
+        handAnimationConfig = FannedHandAnimationConfig(
+            drawAnimation = inputs.localAnimatingCardIndex.takeIf { it >= 0 }?.let { index ->
+                index to (inputs.localDrawStartOffset ?: Offset.Zero)
+            },
+            drawProgress = { inputs.drawProgress }
+        ),
+        handCallbacks = FannedHandCallbacks(
+            canActivateCard = callbacks.canActivateCard,
+            onCardSelected = callbacks.onCardSelectionToggle,
+            onCardActivated = callbacks.onCardActivated
+        )
+    )
+}
+
+@Composable
+private fun ResetDoomInteractionState(
+    isResolvingLocalDoom: Boolean,
+    pendingDoomRequiresSelection: Boolean,
+    onResetSelection: () -> Unit,
+    onResetSlider: () -> Unit
+) {
     LaunchedEffect(isResolvingLocalDoom) {
         if (isResolvingLocalDoom) {
-            selectedPlayerCardIndex = -1
-            doomSliderPosition = 0f
+            onResetSelection()
+            onResetSlider()
         }
     }
 
     LaunchedEffect(pendingDoomRequiresSelection) {
         if (!pendingDoomRequiresSelection) {
-            selectedPlayerCardIndex = -1
+            onResetSelection()
+        }
+    }
+}
+
+@Composable
+private fun rememberTopOpponent(
+    players: List<Player>,
+    localPlayerId: String,
+    currentTurnPlayerId: String
+): Player? {
+    val fallbackOpponent = players.firstOrNull { it.id != localPlayerId }
+    val activeOpponent = players.firstOrNull { it.id == currentTurnPlayerId && it.id != localPlayerId }
+    var lastActiveOpponentId by remember(localPlayerId) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(activeOpponent?.id, fallbackOpponent?.id, players.size) {
+        lastActiveOpponentId = when {
+            activeOpponent != null -> activeOpponent.id
+            lastActiveOpponentId == null -> fallbackOpponent?.id
+            players.none { it.id == lastActiveOpponentId && it.id != localPlayerId } -> fallbackOpponent?.id
+            else -> lastActiveOpponentId
         }
     }
 
-    var previousLocalHandSize by remember(localPlayer.id) { mutableIntStateOf(localPlayer.hand.size) }
-    var previousOpponentHandSize by remember(topOpponent?.id) { mutableIntStateOf(opponentVisibleHandSize) }
-    var hasInitializedHandTracking by remember(localPlayer.id, topOpponent?.id) { mutableStateOf(false) }
+    return players.firstOrNull { it.id == lastActiveOpponentId && it.id != localPlayerId }
+        ?: fallbackOpponent
+}
 
-    LaunchedEffect(localPlayer.hand.size, opponentVisibleHandSize, topOpponent?.id) {
+private fun resolvePausedRemotePlayerName(
+    rawName: String?,
+    players: List<Player>,
+    playerNames: Map<String, String>
+): String? {
+    if (rawName == null) return null
+
+    val matchedPlayer = players.firstOrNull { player ->
+        val displayName = resolvePlayerDisplayName(
+            playerId = player.id,
+            fallbackName = player.name,
+            playerNames = playerNames
+        )
+        displayName == rawName || player.name == rawName || player.id == rawName
+    }
+
+    return matchedPlayer?.let { player ->
+        resolvePlayerDisplayName(
+            playerId = player.id,
+            fallbackName = player.name,
+            playerNames = playerNames
+        )
+    } ?: rawName
+}
+
+@Composable
+private fun rememberHandDrawState(
+    localPlayerId: String,
+    localHandSize: Int,
+    opponentId: String?,
+    opponentVisibleHandSize: Int
+): HandDrawState {
+    val drawAnimatable = remember { Animatable(0f) }
+    var localAnimatingCardIndex by remember(localPlayerId) { mutableIntStateOf(-1) }
+    var opponentAnimatingCardIndex by remember(opponentId) { mutableIntStateOf(-1) }
+    var isAnimatingLocalDraw by remember(localPlayerId) { mutableStateOf(false) }
+    var previousLocalHandSize by remember(localPlayerId) { mutableIntStateOf(localHandSize) }
+    var previousOpponentHandSize by remember(opponentId) { mutableIntStateOf(opponentVisibleHandSize) }
+    var hasInitializedHandTracking by remember(localPlayerId, opponentId) { mutableStateOf(false) }
+
+    LaunchedEffect(localHandSize, opponentVisibleHandSize, opponentId) {
         if (!hasInitializedHandTracking) {
-            previousLocalHandSize = localPlayer.hand.size
+            previousLocalHandSize = localHandSize
             previousOpponentHandSize = opponentVisibleHandSize
             hasInitializedHandTracking = true
             return@LaunchedEffect
         }
 
-        if (localPlayer.hand.size > previousLocalHandSize && !isAnimatingLocalDraw) {
-            localAnimatingCardIndex = localPlayer.hand.lastIndex
+        if (localHandSize > previousLocalHandSize && !isAnimatingLocalDraw) {
+            localAnimatingCardIndex = localHandSize - 1
             isAnimatingLocalDraw = true
-            drawAnimatable.snapTo(0f)
-            drawAnimatable.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(800, easing = FastOutSlowInEasing)
-            )
+            runDrawAnimation(drawAnimatable)
             isAnimatingLocalDraw = false
             localAnimatingCardIndex = -1
         }
 
-        if (opponentVisibleHandSize > previousOpponentHandSize && !isAnimatingOpponentDraw) {
+        if (opponentVisibleHandSize > previousOpponentHandSize) {
             opponentAnimatingCardIndex = opponentVisibleHandSize - 1
-            isAnimatingOpponentDraw = true
-            drawAnimatable.snapTo(0f)
-            drawAnimatable.animateTo(
-                targetValue = 1f,
-                animationSpec = tween(800, easing = FastOutSlowInEasing)
-            )
-            isAnimatingOpponentDraw = false
+            runDrawAnimation(drawAnimatable)
             opponentAnimatingCardIndex = -1
         }
 
-        previousLocalHandSize = localPlayer.hand.size
+        previousLocalHandSize = localHandSize
         previousOpponentHandSize = opponentVisibleHandSize
     }
 
-    val visibleTurns = buildVisibleTurnOrder(
-        players = state.players,
-        currentTurnPlayerId = state.currentTurnPlayerId,
-        currentPlayerIndex = state.currentPlayerIndex
+    return HandDrawState(
+        localAnimatingCardIndex = localAnimatingCardIndex,
+        opponentAnimatingCardIndex = opponentAnimatingCardIndex,
+        isAnimatingLocalDraw = isAnimatingLocalDraw,
+        progress = drawAnimatable.value
     )
-    val localDrawStartOffset = remember(deckCenter, localHandCenter) {
-        val deck = deckCenter
-        val hand = localHandCenter
-        if (deck != null && hand != null) deck - hand else null
-    }
-    val opponentDrawStartOffset = remember(deckCenter, opponentHandCenter) {
-        val deck = deckCenter
-        val hand = opponentHandCenter
-        if (deck != null && hand != null) hand - deck else null
-    }
-    val handleDraw = {
-        if (isLocalPlayersTurn && !isAnimatingLocalDraw && state.deckSize > 0 && !isResolvingLocalDoom) {
-            selectedPlayerCardIndex = -1
+}
 
-            viewModel.draw(localPlayer.id)
-        }
-    }
+private suspend fun runDrawAnimation(drawAnimatable: Animatable<Float, AnimationVector1D>) {
+    drawAnimatable.snapTo(0f)
+    drawAnimatable.animateTo(
+        targetValue = 1f,
+        animationSpec = tween(800, easing = FastOutSlowInEasing)
+    )
+}
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundCream)
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.weight(0.8f))
-
-            Box(
-                modifier = Modifier.weight(1.7f).fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                CenterPlayArea(
-                    deckSize = state.deckSize,
-                    isLocalPlayersTurn = isLocalPlayersTurn,
-                    currentTurnPlayerName = currentTurnPlayerName,
-                    visibleTurns = visibleTurns,
-                    playerAvatars = playerAvatars,
-                    onDrawClick = handleDraw,
-                    onDeckCenterMeasured = { deckCenter = it }
-                )
-            }
-            Spacer(modifier = Modifier.weight(1.5f))
-        }
-
-        DecorativeSideBorders()
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(3f),
-            contentAlignment = Alignment.TopCenter
-        ) {
-            OpponentArea(
-                opponent = topOpponent,
-                opponentName = topOpponentName,
-                drawAnimation = opponentAnimatingCardIndex.takeIf { it >= 0 }?.let { index ->
-                    index to (opponentDrawStartOffset ?: Offset.Zero)
-                },
-                drawProgress = { drawAnimatable.value },
-                onHandCenterMeasured = { opponentHandCenter = it }
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsTopHeight(WindowInsets.statusBars)
-                .background(BackgroundCream)
-                .zIndex(4f)
-                .align(Alignment.TopCenter)
-        )
-
-        if (pendingDoom != null && pendingDoomRequiresInsertionUi) {
+@Composable
+private fun BoardOverlays(
+    overlayState: BoardOverlayState,
+    context: BoardOverlayContext,
+    callbacks: BoardOverlayCallbacks
+) {
+    when {
+        overlayState.pendingDoom != null && overlayState.pendingDoomRequiresInsertionUi -> {
             DoomOverlay(
                 state = DoomOverlayState(
-                    pendingDoom = pendingDoom!!,
-                    deckSize = state.deckSize,
-                    currentPlayer = localPlayer,
-                    selectedPlayerCardIndex = selectedPlayerCardIndex,
+                    pendingDoom = overlayState.pendingDoom,
+                    deckSize = context.deckSize,
+                    currentPlayer = context.currentPlayer,
+                    selectedPlayerCardIndex = context.selectedPlayerCardIndex,
                     hasDefused = true,
-                    doomSliderPosition = doomSliderPosition
+                    doomSliderPosition = context.doomSliderPosition
                 ),
                 onDefuseTriggered = {},
-                onDoomSliderChange = { doomSliderPosition = it },
-                onDoomConfirmed = {
-                    viewModel.insertDoom(doomSliderPosition.toInt())
-                    doomSliderPosition = 0f
-                    selectedPlayerCardIndex = -1
-                },
+                onDoomSliderChange = callbacks.onDoomSliderChange,
+                onDoomConfirmed = callbacks.onDoomConfirmed,
                 onAcceptDoom = {}
             )
-        } else if (pendingDoom != null && pendingDoomMessage != null) {
+        }
+
+        overlayState.pendingDoom != null && overlayState.pendingDoomMessage != null -> {
             DoomResolvedOverlay(
-                card = pendingDoom!!,
-                currentPlayer = localPlayer,
-                selectedPlayerCardIndex = selectedPlayerCardIndex,
-                message = pendingDoomMessage!!,
-                requiresSnackSelection = pendingDoomRequiresSelection,
-                onDismiss = { viewModel.dismissDoomNotice(selectedPlayerCardIndex) }
+                card = overlayState.pendingDoom,
+                currentPlayer = context.currentPlayer,
+                selectedPlayerCardIndex = context.selectedPlayerCardIndex,
+                message = overlayState.pendingDoomMessage,
+                requiresSnackSelection = overlayState.pendingDoomRequiresSelection,
+                onDismiss = callbacks.onDoomDismiss
             )
-        } else if (
-            pausedForDoomPlayerName != null &&
-            pausedForDoomMessage != null &&
-            pausedForDoomDetail != null
-        ) {
+        }
+
+        overlayState.pausedForDoomPlayerName != null &&
+            overlayState.pausedForDoomMessage != null &&
+            overlayState.pausedForDoomDetail != null -> {
             RemoteDoomPauseOverlay(
-                playerName = pausedRemotePlayerName ?: pausedForDoomPlayerName!!,
-                message = pausedForDoomMessage!!,
-                detail = pausedForDoomDetail!!
+                playerName = overlayState.pausedRemotePlayerName ?: overlayState.pausedForDoomPlayerName,
+                message = overlayState.pausedForDoomMessage,
+                detail = overlayState.pausedForDoomDetail
             )
         }
+    }
 
-        if (cardCommandNotice != null) {
-            CardCommandNoticeOverlay(
-                notice = cardCommandNotice!!,
-                onDismiss = viewModel::dismissCardCommandNotice
-            )
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .zIndex(if (pendingDoomRequiresSelection) 7f else 0f)
-        ) {
-            PlayerArea(
-                currentPlayer = localPlayer,
-                currentPlayerName = localPlayerName,
-                selectedPlayerCardIndex = selectedPlayerCardIndex,
-                disableDefocus = pendingDoomRequiresSelection,
-                suppressTooltip = isResolvingLocalDoom,
-                interactionEnabled = !isLifeLossDoomOverlay,
-                localDrawAnimation = localAnimatingCardIndex.takeIf { it >= 0 }?.let { index ->
-                    index to (localDrawStartOffset ?: Offset.Zero)
-                },
-                drawProgress = { drawAnimatable.value },
-                canActivateCard = viewModel::canActivateCard,
-                onHandCenterMeasured = { localHandCenter = it },
-                onCardSelected = {
-                    selectedPlayerCardIndex = if (selectedPlayerCardIndex == it) -1 else it
-                },
-                onCardActivated = { card ->
-                    selectedPlayerCardIndex = -1
-                    viewModel.activateCard(card)
-                }
-            )
-        }
+    overlayState.cardCommandNotice?.let { notice ->
+        CardCommandNoticeOverlay(
+            notice = notice,
+            onDismiss = callbacks.onCardCommandDismiss
+        )
     }
 }
 
@@ -408,11 +651,15 @@ private fun OpponentArea(
         ) {
             FannedHand(
                 cards = opponentDummyHand,
-                isOpponent = true,
-                selectedIndex = -1,
-                drawAnimation = drawAnimation,
-                drawProgress = drawProgress,
-                onCenterMeasured = onHandCenterMeasured
+                uiConfig = FannedHandUiConfig(
+                    isOpponent = true,
+                    selectedIndex = -1,
+                    onCenterMeasured = onHandCenterMeasured
+                ),
+                animationConfig = FannedHandAnimationConfig(
+                    drawAnimation = drawAnimation,
+                    drawProgress = drawProgress
+                )
             )
         }
         PlayerLabel(
@@ -522,18 +769,7 @@ private fun BoxScope.DecorativeSideBorders() {
 
 @Composable
 private fun PlayerArea(
-    currentPlayer: Player,
-    currentPlayerName: String,
-    selectedPlayerCardIndex: Int,
-    disableDefocus: Boolean,
-    suppressTooltip: Boolean,
-    interactionEnabled: Boolean,
-    localDrawAnimation: Pair<Int, Offset>?,
-    drawProgress: () -> Float,
-    canActivateCard: (Card) -> Boolean,
-    onHandCenterMeasured: (Offset) -> Unit,
-    onCardSelected: (Int) -> Unit,
-    onCardActivated: (Card) -> Unit
+    content: PlayerAreaContent
 ) {
     Box(
         modifier = Modifier.fillMaxSize(),
@@ -557,24 +793,16 @@ private fun PlayerArea(
             modifier = Modifier.fillMaxWidth().offset(y = 58.dp)
         ) {
             FannedHand(
-                cards = currentPlayer.hand,
-                isOpponent = false,
-                selectedIndex = selectedPlayerCardIndex,
-                disableDefocus = disableDefocus,
-                suppressTooltip = suppressTooltip,
-                interactionEnabled = interactionEnabled,
-                drawAnimation = localDrawAnimation,
-                drawProgress = drawProgress,
-                canActivateCard = canActivateCard,
-                onCenterMeasured = onHandCenterMeasured,
-                onCardSelected = onCardSelected,
-                onCardActivated = onCardActivated
+                cards = content.player.hand,
+                uiConfig = content.handUiConfig,
+                animationConfig = content.handAnimationConfig,
+                callbacks = content.handCallbacks
             )
         }
 
         PlayerLabel(
-            name = currentPlayerName,
-            lives = currentPlayer.lives,
+            name = content.playerName,
+            lives = content.player.lives,
             modifier = Modifier.padding(bottom = 8.dp).zIndex(200f)
         )
     }

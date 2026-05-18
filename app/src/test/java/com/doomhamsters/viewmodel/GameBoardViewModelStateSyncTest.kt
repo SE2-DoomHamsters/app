@@ -2,7 +2,6 @@ package com.doomhamsters.viewmodel
 
 
 
-import android.util.Log
 import com.doomhamsters.GameRepository
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
@@ -10,6 +9,7 @@ import com.doomhamsters.model.GameState
 import com.doomhamsters.model.Player
 import com.doomhamsters.model.Status
 import io.mockk.*
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -25,19 +25,17 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class GameBoardViewModelStateSyncTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var repository: GameRepository
     private lateinit var gameStateFlow: MutableSharedFlow<GameState>
+    private val createdViewModels = mutableListOf<GameBoardViewModel>()
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
-        every { Log.e(any(), any(), any()) } returns 0
-        every { Log.e(any(), any()) } returns 0
         repository = mockk(relaxed = true)
         gameStateFlow = MutableSharedFlow()
         coEvery { repository.subscribeToGame("game-1") } returns emptyFlow()
@@ -45,7 +43,8 @@ class GameBoardViewModelStateSyncTest {
 
     @AfterEach
     fun tearDown() {
-        unmockkStatic(Log::class)
+        createdViewModels.forEach(::clearViewModel)
+        createdViewModels.clear()
         Dispatchers.resetMain()
     }
 
@@ -71,7 +70,7 @@ class GameBoardViewModelStateSyncTest {
         coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
         coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
 
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = localPlayerId,
             localPlayerName = "Local",
@@ -91,6 +90,7 @@ class GameBoardViewModelStateSyncTest {
     @Test
     fun `doom draw event is informational because backend resolves doom automatically`() = runTest {
         val localPlayerId = "player-1"
+        val privateEventFlow = MutableSharedFlow<JSONObject>()
         val initialState = gameState(
             currentPlayerId = localPlayerId,
             localHand = listOf(Card(CardType.SnackStash, id = "s1")),
@@ -109,16 +109,19 @@ class GameBoardViewModelStateSyncTest {
             .put("card", Card(CardType.Doom, id = "doom-1").toJson())
 
         coEvery { repository.connect() } just Runs
-        coEvery { repository.fetchGameState("game-1", localPlayerId) } returnsMany listOf(initialState, afterDefuseState)
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returns initialState
         coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
-        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns flowOf(doomEvent)
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns privateEventFlow
         coEvery { repository.sendAction(any(), any(), any()) } just Runs
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = localPlayerId,
             localPlayerName = "Local",
             repository = repository
         )
+        advanceUntilIdle()
+        privateEventFlow.emit(doomEvent)
+        gameStateFlow.emit(afterDefuseState)
         advanceUntilIdle()
 
         assertEquals(CardType.Doom, viewModel.pendingDoom.value?.type)
@@ -163,7 +166,7 @@ class GameBoardViewModelStateSyncTest {
         coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
         coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns flowOf(doomEvent)
         coEvery { repository.sendAction(any(), any(), any()) } just Runs
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = localPlayerId,
             localPlayerName = "Local",
@@ -206,7 +209,7 @@ class GameBoardViewModelStateSyncTest {
                 .put("card", Card(CardType.Doom, id = "doom-1").toJson())
         )
         coEvery { repository.sendAction(any(), any(), any()) } just Runs
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = localPlayerId,
             localPlayerName = "Local",
@@ -236,6 +239,7 @@ class GameBoardViewModelStateSyncTest {
     @Test
     fun `doom insert sends insert before next turn after snack stash selection`() = runTest {
         val localPlayerId = "player-1"
+        val privateEventFlow = MutableSharedFlow<JSONObject>()
         val initialState = gameState(
             currentPlayerId = localPlayerId,
             localHand = listOf(Card(CardType.SnackStash, id = "s1")),
@@ -254,16 +258,20 @@ class GameBoardViewModelStateSyncTest {
             .put("card", Card(CardType.Doom, id = "doom-insert").toJson())
 
         coEvery { repository.connect() } just Runs
-        coEvery { repository.fetchGameState("game-1", localPlayerId) } returnsMany listOf(initialState, resolvingState, resolvingState)
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returnsMany listOf(resolvingState, resolvingState)
         coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
-        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns flowOf(doomEvent)
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns privateEventFlow
         coEvery { repository.sendAction(any(), any(), any()) } just Runs
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = localPlayerId,
             localPlayerName = "Local",
             repository = repository
         )
+        advanceUntilIdle()
+        gameStateFlow.emit(initialState)
+        privateEventFlow.emit(doomEvent)
+        gameStateFlow.emit(resolvingState)
         advanceUntilIdle()
 
         viewModel.dismissDoomNotice(0)
@@ -314,7 +322,7 @@ class GameBoardViewModelStateSyncTest {
         coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
         coEvery { repository.subscribeToPrivateEvents("game-1", "player-1") } returns emptyFlow()
 
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = "player-1",
             localPlayerName = "Local",
@@ -373,7 +381,7 @@ class GameBoardViewModelStateSyncTest {
         coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
         coEvery { repository.subscribeToPrivateEvents("game-1", "player-1") } returns emptyFlow()
 
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = "player-1",
             localPlayerName = "Local",
@@ -426,7 +434,7 @@ class GameBoardViewModelStateSyncTest {
         coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
         coEvery { repository.subscribeToPrivateEvents("game-1", "player-1") } returns emptyFlow()
 
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = "player-1",
             localPlayerName = "Local",
@@ -434,7 +442,8 @@ class GameBoardViewModelStateSyncTest {
         )
         advanceUntilIdle()
 
-        assertEquals(null, viewModel.gameState.value!!.currentTurnPlayerId)
+        assertEquals(null, viewModel.gameState.value!!.currentPlayerId)
+        assertEquals("player-1", viewModel.gameState.value!!.currentTurnPlayerId)
         assertEquals(null, viewModel.gameState.value!!.resolvingDoomPlayerId)
         assertEquals(null, viewModel.pausedForDoomPlayerName.value)
         assertEquals(null, viewModel.pausedForDoomMessage.value)
@@ -472,7 +481,7 @@ class GameBoardViewModelStateSyncTest {
         coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
         coEvery { repository.sendAction(any(), any(), any()) } just Runs
 
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = localPlayerId,
             localPlayerName = "Local",
@@ -518,7 +527,7 @@ class GameBoardViewModelStateSyncTest {
         coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
         coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns flowOf(resultEvent)
 
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = localPlayerId,
             localPlayerName = "Local",
@@ -569,5 +578,24 @@ class GameBoardViewModelStateSyncTest {
             pendingDoomRequiresInsertion = pendingDoomRequiresInsertion,
             pendingDoomCardId = pendingDoomCardId
         )
+    }
+
+    private fun createViewModel(
+        gameId: String,
+        initialLocalPlayerId: String,
+        localPlayerName: String,
+        repository: GameRepository
+    ): GameBoardViewModel =
+        GameBoardViewModel(
+            gameId = gameId,
+            initialLocalPlayerId = initialLocalPlayerId,
+            localPlayerName = localPlayerName,
+            repository = repository
+        ).also(createdViewModels::add)
+
+    private fun clearViewModel(viewModel: GameBoardViewModel) {
+        GameBoardViewModel::class.java.getDeclaredMethod("onCleared")
+            .apply { isAccessible = true }
+            .invoke(viewModel)
     }
 }

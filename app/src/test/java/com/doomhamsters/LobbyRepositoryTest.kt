@@ -1,6 +1,5 @@
 package com.doomhamsters
 
-import android.util.Log
 import com.doomhamsters.data.User
 import io.mockk.Runs
 import io.mockk.coEvery
@@ -9,7 +8,6 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import kotlinx.coroutines.test.runTest
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
@@ -47,14 +45,7 @@ class LobbyRepositoryTest {
         mockStompClient = mockk()
         mockSession = mockk(relaxed = true)
         mockCall = mockk()
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
         repository = LobbyRepository("localhost:8080", mockHttpClient, mockStompClient)
-    }
-
-    @org.junit.jupiter.api.AfterEach
-    fun tearDown() {
-        unmockkStatic(Log::class)
     }
 
     @Test

@@ -1,6 +1,5 @@
 package com.doomhamsters.viewmodel
 
-import android.util.Log
 import com.doomhamsters.GameRepository
 import com.doomhamsters.model.GameState
 import com.doomhamsters.model.Player
@@ -8,11 +7,9 @@ import com.doomhamsters.model.Status
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -25,18 +22,16 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class GameBoardViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var repository: GameRepository
+    private val createdViewModels = mutableListOf<GameBoardViewModel>()
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
-        every { Log.e(any(), any(), any()) } returns 0
-        every { Log.e(any(), any()) } returns 0
         repository = mockk(relaxed = true)
         coEvery { repository.connect() } just Runs
         coEvery { repository.subscribeToGame("game-1") } returns emptyFlow()
@@ -46,7 +41,8 @@ class GameBoardViewModelTest {
 
     @AfterEach
     fun tearDown() {
-        unmockkStatic(Log::class)
+        createdViewModels.forEach(::clearViewModel)
+        createdViewModels.clear()
         Dispatchers.resetMain()
     }
 
@@ -61,7 +57,7 @@ class GameBoardViewModelTest {
         coEvery { repository.fetchGameState("game-1", "player-1") } returns state
         coEvery { repository.subscribeToPrivateEvents("game-1", "player-1") } returns emptyFlow()
 
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = "player-1",
             localPlayerName = "Alex",
@@ -84,7 +80,7 @@ class GameBoardViewModelTest {
         coEvery { repository.fetchGameState("game-1", "server-42") } returns state
         coEvery { repository.subscribeToPrivateEvents("game-1", "server-42") } returns emptyFlow()
 
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = "client-temp",
             localPlayerName = "Alex",
@@ -107,7 +103,7 @@ class GameBoardViewModelTest {
         coEvery { repository.fetchGameState("game-1", "client-temp") } returns state
         coEvery { repository.subscribeToPrivateEvents("game-1", "client-temp") } returns emptyFlow()
 
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = "client-temp",
             localPlayerName = "Alex",
@@ -131,7 +127,7 @@ class GameBoardViewModelTest {
         coEvery { repository.fetchGameState("game-1", "player-1") } returns state
         coEvery { repository.subscribeToPrivateEvents("game-1", "player-1") } returns emptyFlow()
 
-        val viewModel = GameBoardViewModel(
+        val viewModel = createViewModel(
             gameId = "game-1",
             initialLocalPlayerId = "player-1",
             localPlayerName = "Alex",
@@ -152,4 +148,23 @@ class GameBoardViewModelTest {
             status = Status.Playing,
             currentPlayerId = players.firstOrNull()?.id
         )
+
+    private fun createViewModel(
+        gameId: String,
+        initialLocalPlayerId: String,
+        localPlayerName: String,
+        repository: GameRepository
+    ): GameBoardViewModel =
+        GameBoardViewModel(
+            gameId = gameId,
+            initialLocalPlayerId = initialLocalPlayerId,
+            localPlayerName = localPlayerName,
+            repository = repository
+        ).also(createdViewModels::add)
+
+    private fun clearViewModel(viewModel: GameBoardViewModel) {
+        GameBoardViewModel::class.java.getDeclaredMethod("onCleared")
+            .apply { isAccessible = true }
+            .invoke(viewModel)
+    }
 }

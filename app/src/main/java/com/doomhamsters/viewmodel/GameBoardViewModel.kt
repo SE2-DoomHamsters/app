@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 
 open class GameBoardViewModel(
@@ -387,10 +388,10 @@ open class GameBoardViewModel(
     }
 
     override fun onCleared() {
-        super.onCleared()
-        viewModelScope.launch {
+        runBlocking {
             repository.disconnect()
         }
+        super.onCleared()
     }
 
     private fun checkGameOver(state: GameState) {

@@ -20,12 +20,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import java.util.UUID
 import kotlin.random.Random
 
 class LobbyViewModel(
     private val repository: LobbyRepository = LobbyRepository(BackendConfig.BASE_URL),
-    private val userId: String = UUID.randomUUID().toString()
+    private val userId: String = UUID.randomUUID().toString(),
+    private val enableLobbyRefresh: Boolean = true
 ) : ViewModel() {
     companion object {
         const val TAG = "LobbyDebug"
@@ -194,7 +196,9 @@ class LobbyViewModel(
         Log.d(TAG, "Observing lobby=$lobbyId")
         stopLobbyObservers()
         observedLobbyId = lobbyId
-        launchLobbyRefresh(lobbyId)
+        if (enableLobbyRefresh) {
+            launchLobbyRefresh(lobbyId)
+        }
         ensureRealtimeLobbyObservers(lobbyId)
     }
 
@@ -308,6 +312,18 @@ class LobbyViewModel(
         lobbyUpdatesJob?.cancelAndJoin()
         gameStartJob?.cancelAndJoin()
         lobbyRefreshJob?.cancelAndJoin()
+        clearLobbyObserverRefs()
+    }
+
+    private fun cancelLobbyObservers() {
+        Log.d(TAG, "Cancelling lobby observers for lobby=$observedLobbyId")
+        lobbyUpdatesJob?.cancel()
+        gameStartJob?.cancel()
+        lobbyRefreshJob?.cancel()
+        clearLobbyObserverRefs()
+    }
+
+    private fun clearLobbyObserverRefs() {
         lobbyUpdatesJob = null
         gameStartJob = null
         lobbyRefreshJob = null
@@ -326,11 +342,11 @@ class LobbyViewModel(
 
     override fun onCleared() {
         Log.d(TAG, "LobbyViewModel.onCleared for lobby=$observedLobbyId user=$userId")
-        super.onCleared()
-        viewModelScope.launch {
-            stopLobbyObservers()
+        cancelLobbyObservers()
+        runBlocking {
             repository.disconnect()
         }
+        super.onCleared()
     }
 
     fun canCurrentUserStartGame(): Boolean {

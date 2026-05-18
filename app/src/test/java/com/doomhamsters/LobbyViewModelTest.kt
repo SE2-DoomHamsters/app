@@ -1,17 +1,14 @@
 package com.doomhamsters
 
-import android.util.Log
 import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
 import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerifyOrder
 import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -29,6 +26,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LobbyViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -53,17 +51,21 @@ class LobbyViewModelTest {
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        mockkStatic(Log::class)
-        every { Log.d(any(), any()) } returns 0
         mockRepo = mockk(relaxed = true)
         gameStartFlow = MutableSharedFlow()
         coEvery { mockRepo.subscribeGameStart(any()) } returns gameStartFlow
-        viewModel = LobbyViewModel(repository = mockRepo, userId = "fixed-id")
+        viewModel = LobbyViewModel(
+            repository = mockRepo,
+            userId = "fixed-id",
+            enableLobbyRefresh = false
+        )
     }
 
     @AfterEach
     fun tearDown() {
-        unmockkStatic(Log::class)
+        LobbyViewModel::class.java.getDeclaredMethod("onCleared")
+            .apply { isAccessible = true }
+            .invoke(viewModel)
         Dispatchers.resetMain()
     }
 
@@ -240,7 +242,7 @@ class LobbyViewModelTest {
     }
 
     @Test
-    fun `joinLobby subscribes before sending join request`() = runTest {
+    fun `joinLobby connects before sending join request and starts subscriptions`() = runTest {
         coEvery { mockRepo.connect() } just Runs
         coEvery { mockRepo.joinLobby(any(), any()) } returns fakeLobby
         coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
@@ -254,10 +256,10 @@ class LobbyViewModelTest {
 
         coVerifyOrder {
             mockRepo.connect()
-            mockRepo.subscribeLobbyUpdates("DOOMUNIT")
-            mockRepo.subscribeGameStart("DOOMUNIT")
             mockRepo.joinLobby("DOOMUNIT", User("fixed-id", "Anna", "hamster"))
         }
+        coVerify(atLeast = 1) { mockRepo.subscribeLobbyUpdates("DOOMUNIT") }
+        coVerify(atLeast = 1) { mockRepo.subscribeGameStart("DOOMUNIT") }
     }
 
     @Test
@@ -331,12 +333,10 @@ class LobbyViewModelTest {
         coEvery { mockRepo.createLobby(any(), any()) } returns startableLobby
         coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
         coEvery { mockRepo.subscribeGameStart(any()) } returns emptyFlow()
-        coEvery { mockRepo.getLobby(any()) } returnsMany listOf(
-            startableLobby,
+        coEvery { mockRepo.getLobby(any()) } returns
             startableLobby.copy(
                 gameId = "game-1",
                 gameStarted = true
-            )
         )
 
         viewModel.username = "Christian"

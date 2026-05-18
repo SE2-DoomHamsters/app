@@ -42,7 +42,6 @@ fun TurnTracker(
     modifier: Modifier = Modifier
 ) {
     if (visibleTurns.isEmpty()) return
-    val turnOrderKey = visibleTurns.joinToString(separator = "|") { player -> player.id }
     val density = LocalDensity.current
     val slotShiftPx = with(density) { (turnTrackerSlotHeight(visibleTurns.size) + 4.dp).roundToPx() }
 
@@ -82,7 +81,7 @@ fun TurnTracker(
                         .fillMaxHeight()
                 ) {
                     AnimatedContent(
-                        targetState = turnOrderKey,
+                        targetState = visibleTurns,
                         transitionSpec = {
                             slideInVertically(
                                 animationSpec = tween(durationMillis = 450),
@@ -93,9 +92,9 @@ fun TurnTracker(
                             ) using SizeTransform(clip = false)
                         },
                         label = "turnTrackerConveyor"
-                    ) {
+                    ) { animatedTurns ->
                         TurnTrackerContent(
-                            visibleTurns = visibleTurns,
+                            visibleTurns = animatedTurns,
                             playerAvatars = playerAvatars
                         )
                     }

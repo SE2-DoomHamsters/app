@@ -15,6 +15,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
 
+/**
+ * Das ViewModel für die Verwaltung der Lobby-Phase.
+ * Kümmert sich um das Erstellen und Beitreten von Räumen sowie das Abfangen des Spielstarts.
+ */
 class LobbyViewModel(
     private val repository: LobbyRepository = LobbyRepository("10.0.2.2:53217"),
     private val userId: String = UUID.randomUUID().toString()
@@ -34,6 +38,10 @@ class LobbyViewModel(
     private val _navigateToGame = MutableSharedFlow<Pair<String, String>>()
     val navigateToGame: SharedFlow<Pair<String, String>> = _navigateToGame
 
+    /**
+     * Erstellt eine neue Spielgruppe/Lobby im Backend auf Basis der Benutzereingaben.
+     * Startet asynchronen Listener für Lobby-updates und Spielstart-Signal des Servers.
+     */
     fun createGroup() {
         if (username.isBlank() || groupName.isBlank()) return
         viewModelScope.launch {
@@ -66,6 +74,12 @@ class LobbyViewModel(
             }
         }
     }
+    /**
+     * Lässt den Spieler einer existierenden Lobby beitreten, nachdem der QR-Code gescannt wurde.
+     * Startet die asynchronen Listener für Lobby-Updates und das Spielstart-Signal.
+     *
+     * @param scannedLobbyId Die aus dem QR-Code ausgelesene Lobby-ID.
+     */
     fun joinLobby(scannedLobbyId: String) {
         if (username.isBlank()) {
             _error.value = "Bitte gib zuerst deinen Spielernamen ein!"
@@ -110,7 +124,10 @@ class LobbyViewModel(
 
 
 
-
+    /**
+     * Wird vom Host aufgerufen, um das Spiel offiziell zu starten.
+     * Triggert den POST-Request im Backend, der das Signal für alle Spieler auslöst.
+     */
     fun startGame() {
         val currentLobbyId = _lobby.value?.lobbyId ?: return
         viewModelScope.launch {
@@ -123,7 +140,10 @@ class LobbyViewModel(
             }
         }
     }
-
+    /**
+     * Wird aufgerufen, wenn das ViewModel nicht mehr benötigt und zerstört wird.
+     * Schließt die Verbindung zum Repository asynchron, um Ressourcen freizugeben.
+     */
     override fun onCleared() {
         super.onCleared()
         viewModelScope.launch { repository.disconnect() }

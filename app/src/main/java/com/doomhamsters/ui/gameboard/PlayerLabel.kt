@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.doomhamsters.ui.theme.*
 
+/** Renders a player's name and life total with the board label styling. */
 @Composable
 fun PlayerLabel(name: String, lives: Int, modifier: Modifier = Modifier) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
@@ -26,6 +27,7 @@ fun PlayerLabel(name: String, lives: Int, modifier: Modifier = Modifier) {
     }
 }
 
+/** Draws bold text with a filled center and outline stroke. */
 @Composable
 fun OutlinedText(text: String, outlineColor: Color, fillColor: Color, fontSize: TextUnit, outlineWidth: Dp = 2.dp) {
     Box(contentAlignment = Alignment.Center) {

@@ -3,6 +3,7 @@ package com.doomhamsters.model
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Represents a player within a game state snapshot. */
 class Player(
     val id: String,
     var lives: Int,
@@ -12,9 +13,12 @@ class Player(
     private val handSizeHint: Int = 0
 ) {
     val hand = ArrayList<Card>()
+    /** Returns whether the player is still alive. */
     fun isAlive(): Boolean = aliveFlag ?: (lives > 0)
+    /** Returns the hand size that should be shown in the UI. */
     fun visibleHandSize(): Int = maxOf(hand.size, handSizeHint)
 
+    /** Serializes this player into the JSON format used by the backend. */
     fun toJson(): JSONObject = JSONObject().apply {
         put("id", id)
         put("playerName", name)
@@ -28,6 +32,7 @@ class Player(
     }
 
     companion object {
+        /** Builds a player from a backend JSON object. */
         fun fromJson(json: JSONObject): Player {
             val playerId = if (json.has("playerId")) json.getString("playerId") else json.getString("id")
             val handArray = json.optJSONArray("hand") ?: JSONArray()

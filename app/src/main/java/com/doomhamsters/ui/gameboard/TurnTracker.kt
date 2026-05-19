@@ -35,6 +35,7 @@ import com.doomhamsters.ui.theme.BackgroundCream
 import com.doomhamsters.ui.theme.CardDarkMaroon
 import com.doomhamsters.ui.theme.OutlineDark
 
+/** Displays the visible upcoming turn order for the board. */
 @Composable
 fun TurnTracker(
     visibleTurns: List<Player>,

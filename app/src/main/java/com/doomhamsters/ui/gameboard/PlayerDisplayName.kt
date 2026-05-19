@@ -1,5 +1,6 @@
 package com.doomhamsters.ui.gameboard
 
+/** Returns a stable display name for a player based on mappings and fallbacks. */
 fun resolvePlayerDisplayName(
     playerId: String,
     fallbackName: String,

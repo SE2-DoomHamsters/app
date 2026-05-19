@@ -10,6 +10,7 @@ import com.doomhamsters.cards.CardRegistry
 import com.doomhamsters.model.*
 import java.util.UUID
 
+/** Builds fully initialized game states for new matches. */
 object GameFactory {
 
     const val STARTING_LIVES = 3
@@ -17,6 +18,7 @@ object GameFactory {
     private const val BASE_NORMAL_CARDS = 40
     private const val EXTRA_SNACK_STASH_CARDS = 4
 
+    /** Creates a shuffled game state for the supplied players. */
     fun createGame(playerIds: ArrayList<String>): GameState {
         val playerCount = playerIds.size
 

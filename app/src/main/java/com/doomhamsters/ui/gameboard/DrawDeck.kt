@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.doomhamsters.ui.theme.*
 
+/** Renders the draw pile stack and its remaining card count. */
 @Composable
 fun DrawDeck(
     deckSize: Int,

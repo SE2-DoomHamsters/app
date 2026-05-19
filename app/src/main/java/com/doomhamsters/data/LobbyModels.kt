@@ -30,7 +30,6 @@ data class Lobby(
  * @param base64Str Der vom Backend übermittelte Base64-String des Bildes.
  * @return Das decodierte [Bitmap] für die UI-Darstellung oder `null`, falls die Konvertierung fehlschlägt.
  */
-//Macht aus dem text vom Server ein echtes Bild
 fun decodeBase64ToBitmap(base64Str: String): Bitmap? {
     return try {
         val decodedBytes = Base64.decode(base64Str, Base64.DEFAULT)

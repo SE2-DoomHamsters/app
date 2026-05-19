@@ -44,6 +44,7 @@ private val LightColorScheme = lightColorScheme(
     onSurface = CardDarkMaroon
 )
 
+/** Applies the app's Material theme to the provided content. */
 @Composable
 fun DoomHamstersTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),

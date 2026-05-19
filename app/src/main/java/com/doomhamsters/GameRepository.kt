@@ -18,6 +18,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 
+/** Coordinates REST and STOMP calls for an active game session. */
 class GameRepository(
     private val baseUrl: String,
     private val httpClient: OkHttpClient = OkHttpClient(),
@@ -33,22 +34,26 @@ class GameRepository(
     internal var session: StompSession? = null
 
 
+    /** Opens the STOMP session used for game subscriptions and actions. */
     suspend fun connect() {
         Log.d(tag, "Connecting STOMP to ws://$baseUrl/ws")
         session = stompClient.connect("ws://$baseUrl/ws")
         Log.d(tag, "STOMP connected")
     }
 
+    /** Closes the active STOMP session, if one exists. */
     suspend fun disconnect() {
         Log.d(tag, "Disconnecting STOMP session")
         session?.disconnect()
         session = null
     }
 
+    /** Subscribes to the public game event channel. */
     suspend fun subscribeToGame(gameId: String): Flow<String> =
         requireSession()
             .subscribeText("/topic/game/$gameId")
 
+    /** Subscribes to realtime game state snapshots for a game. */
     suspend fun subscribeToGameState(gameId: String): Flow<GameState> =
         requireSession()
             .subscribeText("/topic/game-state/$gameId")
@@ -62,6 +67,7 @@ class GameRepository(
                 }
             }
 
+    /** Subscribes to player-specific private game events. */
     suspend fun subscribeToPrivateEvents(gameId: String, playerId: String): Flow<JSONObject> =
         requireSession()
             .subscribeText("/queue/game/$gameId/$playerId")
@@ -70,6 +76,7 @@ class GameRepository(
                 JSONObject(payload)
             }
 
+    /** Fetches the latest game state snapshot over REST. */
     suspend fun fetchGameState(gameId: String, playerId: String): GameState {
         Log.d(tag, "REST fetch /api/game/$gameId/state?playerId=$playerId")
         val request = Request.Builder()
@@ -92,6 +99,7 @@ class GameRepository(
         }
     }
 
+    /** Sends a game action payload to the backend. */
     suspend fun sendAction(gameId: String, action: String, payload: JSONObject) {
         Log.d(tag, "STOMP send action gameId=$gameId action=$action payload=$payload")
         requireSession().sendText("/app/game/$gameId/$action", payload.toString())

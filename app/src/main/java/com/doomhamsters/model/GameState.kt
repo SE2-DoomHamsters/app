@@ -2,12 +2,14 @@ package com.doomhamsters.model
 import org.json.JSONArray
 import org.json.JSONObject
 
+/** Describes the current lifecycle state of a game. */
 enum class Status {
     Lobby,
     Playing,
     Finished;
 
     companion object {
+        /** Maps backend game-state strings to a known status. */
         fun fromWire(value: String): Status = when (value.trim().uppercase()) {
             "SETUP", "LOBBY" -> Lobby
             "RUNNING", "PLAYING" -> Playing
@@ -17,6 +19,7 @@ enum class Status {
     }
 }
 
+/** Represents the full game snapshot shared between the app and backend. */
 data class GameState(
     val id: String,
     val players: ArrayList<Player>,
@@ -37,6 +40,7 @@ data class GameState(
     val currentTurnPlayerId: String?
         get() = currentPlayerId ?: players.getOrNull(currentPlayerIndex)?.id
 
+    /** Serializes this game state into the app's JSON format. */
     fun toJson(): JSONObject {
         return JSONObject().apply {
             put("id", id)
@@ -58,6 +62,7 @@ data class GameState(
         private fun JSONObject.optNullableString(key: String): String? =
             optString(key).takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
 
+        /** Parses a game state from either the app or backend JSON shape. */
         fun fromJson(json: JSONObject): GameState {
             if (json.has("gameId")) {
                 return fromBackendJson(json)
@@ -87,6 +92,7 @@ data class GameState(
             )
         }
 
+        /** Parses a game state from the backend REST payload shape. */
         fun fromBackendJson(json: JSONObject): GameState {
             val playersList = ArrayList<Player>()
             val playersArray = json.getJSONArray("players")

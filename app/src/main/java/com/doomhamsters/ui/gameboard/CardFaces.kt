@@ -28,6 +28,7 @@ import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 import com.doomhamsters.ui.theme.*
 
+/** Renders the shared card-back artwork. */
 @Composable
 fun CardFaceDown(modifier: Modifier = Modifier, shadowOffset: () -> Float = { 4f }) {
     Box(
@@ -51,6 +52,7 @@ fun CardFaceDown(modifier: Modifier = Modifier, shadowOffset: () -> Float = { 4f
     )
 }
 
+/** Renders the visible front face for a specific card. */
 @Composable
 fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: Modifier = Modifier, shadowOffset: () -> Float = { 4f }) {
     val (bgColor, innerBorderColor, textColor) = when (card.type) {

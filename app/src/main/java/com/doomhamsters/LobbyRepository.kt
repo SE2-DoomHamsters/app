@@ -42,20 +42,24 @@ class LobbyRepository(
 
     internal var session: StompSession? = null
 
+    /** Returns whether the realtime lobby STOMP session is currently open. */
     fun isConnected(): Boolean = session != null
 
+    /** Opens the STOMP session used for lobby subscriptions. */
     suspend fun connect() {
         if (session != null) return
         Log.d(TAG, "Opening STOMP session to ws://$baseUrl/ws")
         session = stompClient.connect("ws://$baseUrl/ws")
     }
 
+    /** Closes the active lobby STOMP session. */
     suspend fun disconnect() {
         Log.d(TAG, "Closing STOMP session")
         session?.disconnect()
         session = null
     }
 
+    /** Creates a new lobby for the supplied group and user. */
     suspend fun createLobby(groupName: String, user: User): Lobby {
         val body = JSONObject()
             .put("groupName", groupName)
@@ -81,6 +85,7 @@ class LobbyRepository(
         }
     }
 
+    /** Attempts to join an existing lobby and returns its snapshot on success. */
     suspend fun joinLobby(lobbyId: String, user: User): Lobby? {
         val body = user.toJson().toString().toRequestBody("application/json".toMediaType())
 
@@ -116,6 +121,7 @@ class LobbyRepository(
         }
     }
 
+    /** Fetches the latest lobby snapshot. */
     suspend fun getLobby(lobbyId: String): Lobby? {
         val request = Request.Builder()
             .url("http://$baseUrl/api/lobby/$lobbyId")
@@ -136,6 +142,7 @@ class LobbyRepository(
         }
     }
 
+    /** Subscribes to realtime lobby updates. */
     suspend fun subscribeLobbyUpdates(lobbyId: String): Flow<Lobby> =
         checkNotNull(session) { "Call connect() before subscribing" }
             .subscribeText("/topic/lobby/$lobbyId")
@@ -144,6 +151,7 @@ class LobbyRepository(
                 payload.toLobby()
             }
 
+    /** Requests that the backend start a game for the lobby. */
     suspend fun triggerGameStart(lobbyId: String, userId: String) {
         val body = ByteArray(0).toRequestBody("application/json".toMediaType())
 
@@ -162,6 +170,7 @@ class LobbyRepository(
         }
     }
 
+    /** Subscribes to realtime game start notifications for a lobby. */
     suspend fun subscribeGameStart(lobbyId: String): Flow<String> =
         checkNotNull(session) { "Call connect() before subscribing" }
             .subscribeText("/topic/game/$lobbyId")

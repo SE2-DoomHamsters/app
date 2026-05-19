@@ -11,6 +11,7 @@ import androidx.navigation.navArgument
 import com.doomhamsters.ui.GameBoard
 import com.doomhamsters.viewmodel.GameBoardViewModel
 
+/** Defines navigation between the live game board and game-over screen. */
 @Composable
 fun NavGraph(
     viewModel: GameBoardViewModel,

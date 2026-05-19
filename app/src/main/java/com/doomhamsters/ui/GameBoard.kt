@@ -103,6 +103,7 @@ private data class LocalPlayerAreaCallbacks(
     val onCardActivated: (Card) -> Unit
 )
 
+/** Renders the live game board for the local player. */
 @Composable
 fun GameBoard(
     viewModel: GameBoardViewModel,

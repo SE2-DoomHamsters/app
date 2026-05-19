@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.doomhamsters.model.Player
+import com.doomhamsters.ui.gameboard.PlayerListView
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith

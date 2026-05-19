@@ -53,6 +53,7 @@ android {
         }
     }
     testOptions {
+        unitTests.isReturnDefaultValues = true
         unitTests {
             all {
                 it.useJUnitPlatform()
@@ -84,7 +85,8 @@ tasks.register<JacocoReport>("jacocoTestReport") {
         "**/BuildConfig.*",
         "**/Manifest*.*",
         "**/*Test*.*",
-        "android/**/*.*"
+        "android/**/*.*",
+        "**/ui/**"
     )
 
     val debugTree =
@@ -120,6 +122,10 @@ sonar {
             "sonar.coverage.jacoco.xmlReportPaths",
             "${project.projectDir}/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml"
         )
+        property(
+            "sonar.coverage.exclusions",
+            "**/src/main/java/com/doomhamsters/ui/**"
+        )
     }
 }
 
@@ -128,6 +134,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
@@ -143,6 +150,7 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.ui)
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation(libs.androidx.compose.foundation)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)

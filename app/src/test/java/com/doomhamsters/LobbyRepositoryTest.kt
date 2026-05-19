@@ -1,13 +1,12 @@
 package com.doomhamsters
 
-import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
+import io.mockk.Runs
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.Runs
 import io.mockk.mockkStatic
 import kotlinx.coroutines.test.runTest
 import okhttp3.Call
@@ -21,6 +20,7 @@ import org.hildan.krossbow.stomp.StompClient
 import org.hildan.krossbow.stomp.StompSession
 import org.hildan.krossbow.stomp.subscribeText
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.fail
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -34,9 +34,9 @@ class LobbyRepositoryTest {
     private lateinit var mockCall: Call
     private lateinit var repository: LobbyRepository
 
-    private val testUser = User("u1", "HamsterPro", "🐹")
+    private val testUser = User("u1", "HamsterPro", "hamster")
     private val testLobbyJson = """
-        {"lobbyId":"TEST","members":[{"id":"u1","username":"HamsterPro","avatar":"🐹"}],"qrCodeBase64":"base64qr=="}
+        {"lobbyId":"TEST","members":[{"id":"u1","username":"HamsterPro","avatar":"hamster"}],"qrCodeBase64":"base64qr==","gameId":"game-1","gameStarted":true}
     """.trimIndent()
 
     @BeforeEach
@@ -47,8 +47,6 @@ class LobbyRepositoryTest {
         mockCall = mockk()
         repository = LobbyRepository("localhost:8080", mockHttpClient, mockStompClient)
     }
-
-    // ── connect / disconnect ──────────────────────────────────────────────────
 
     @Test
     fun `connect opens stomp session with correct url`() = runTest {
@@ -73,55 +71,56 @@ class LobbyRepositoryTest {
 
     @Test
     fun `disconnect does nothing when not connected`() = runTest {
-        // Should not throw even though session is null
         repository.disconnect()
-
         assertNull(repository.session)
     }
+
     @Test
     fun `triggerGameStart sends post request to correct url`() = runTest {
-        // Erfolgreiche Antwort simulieren
         stubHttpResponse(200, "")
 
-        // Funktion aufrufen
-        repository.triggerGameStart("TEST_LOBBY")
+        repository.triggerGameStart("TEST_LOBBY", "u1")
 
-        // Enthält die Url den Query-Parameter?
         coVerify {
             mockHttpClient.newCall(match { request ->
                 val url = request.url.toString()
-                // Überprüfung der echten Url Struktur
                 url.contains("/api/game/start") &&
-                        url.contains("lobbyId=TEST_LOBBY") &&
-                        request.method == "POST"
+                    url.contains("lobbyId=TEST_LOBBY") &&
+                    url.contains("userId=u1") &&
+                    request.method == "POST"
             })
         }
     }
+
     @Test
-    fun `subscribeGameStart extrahiert die gameId korrekt aus dem JSON`() = runTest {
+    fun `joinLobby throws backend error when join is rejected`() = runTest {
+        stubHttpResponse(409, """{"error":"Game already started"}""")
+
+        val error = try {
+            repository.joinLobby("TEST", testUser)
+            fail("Expected joinLobby to throw")
+        } catch (error: IllegalStateException) {
+            error
+        }
+
+        assertEquals("Game already started", error.message)
+    }
+
+    @Test
+    fun `subscribeGameStart extracts game id from json`() = runTest {
         mockkStatic("org.hildan.krossbow.stomp.StompSessionKt")
-        // 1. Verbindung simulieren
         coEvery { mockStompClient.connect(any()) } returns mockSession
         repository.connect()
 
-        // Fake-Signal vorbereiten
-        val serverSignal = """{"gameId":"neue-game-uuid-123"}"""
-
-        // subscribeText liefert einen Flow<String> , daher erstellung einer Flow mit dem JSON-String
-        val stompFlow = kotlinx.coroutines.flow.flowOf(serverSignal)
-
+        val stompFlow = kotlinx.coroutines.flow.flowOf("""{"gameId":"neue-game-uuid-123"}""")
         coEvery { mockSession.subscribeText(any()) } returns stompFlow
 
-        // Flow vom Repository abfangen
         val repoFlow = repository.subscribeGameStart("TEST_LOBBY")
 
-        // Kommt die ID sauber an?
         repoFlow.collect { extractedId ->
             assertEquals("neue-game-uuid-123", extractedId)
         }
     }
-
-    // ── createLobby ──────────────────────────────────────────────────────────
 
     @Test
     fun `createLobby returns parsed lobby on success`() = runTest {
@@ -133,17 +132,31 @@ class LobbyRepositoryTest {
         assertEquals(1, lobby.members.size)
         assertEquals("HamsterPro", lobby.members[0].username)
         assertEquals("base64qr==", lobby.qrCodeBase64)
+        assertEquals("game-1", lobby.gameId)
+        assertEquals(true, lobby.gameStarted)
     }
 
     @Test
     fun `createLobby parses null qrCode as null`() = runTest {
-        val jsonWithoutQr =
-            """{"lobbyId":"NOQUR","members":[],"qrCodeBase64":""}"""
+        val jsonWithoutQr = """{"lobbyId":"NOQUR","members":[],"qrCodeBase64":""}"""
         stubHttpResponse(200, jsonWithoutQr)
 
         val lobby = repository.createLobby("NoQr", testUser)
 
         assertNull(lobby.qrCodeBase64)
+    }
+
+    @Test
+    fun `createLobby infers game start when payload contains game id alias`() = runTest {
+        stubHttpResponse(
+            200,
+            """{"lobbyId":"TEST","members":[],"currentGameId":"game-alias"}"""
+        )
+
+        val lobby = repository.createLobby("Alias", testUser)
+
+        assertEquals("game-alias", lobby.gameId)
+        assertEquals(true, lobby.gameStarted)
     }
 
     @Test
@@ -155,8 +168,6 @@ class LobbyRepositoryTest {
         }
     }
 
-    // ── joinLobby ─────────────────────────────────────────────────────────────
-
     @Test
     fun `joinLobby returns parsed lobby on success`() = runTest {
         stubHttpResponse(200, testLobbyJson)
@@ -165,6 +176,7 @@ class LobbyRepositoryTest {
 
         assertEquals("TEST", lobby?.lobbyId)
         assertEquals("HamsterPro", lobby?.members?.get(0)?.username)
+        assertEquals("game-1", lobby?.gameId)
     }
 
     @Test
@@ -176,7 +188,16 @@ class LobbyRepositoryTest {
         assertNull(result)
     }
 
-    // ── subscribeLobbyUpdates ─────────────────────────────────────────────────
+    @Test
+    fun `getLobby returns parsed lobby on success`() = runTest {
+        stubHttpResponse(200, testLobbyJson)
+
+        val lobby = repository.getLobby("TEST")
+
+        assertEquals("TEST", lobby?.lobbyId)
+        assertEquals(1, lobby?.members?.size)
+        assertEquals("game-1", lobby?.gameId)
+    }
 
     @Test
     fun `subscribeLobbyUpdates throws when not connected`() = runTest {
@@ -184,8 +205,6 @@ class LobbyRepositoryTest {
             repository.subscribeLobbyUpdates("TEST")
         }
     }
-
-    // ── Helper Methods ───────────────────────────────────────────────────────────────
 
     private fun stubHttpResponse(code: Int, body: String) {
         val responseBody = body.toResponseBody("application/json".toMediaType())

@@ -1,10 +1,17 @@
 package com.doomhamsters.logic
+
+
+
+import com.doomhamsters.cards.CardRegistry
 import com.doomhamsters.model.*
+import com.doomhamsters.logic.cardcommands.CardCommandContext
+import com.doomhamsters.logic.cardcommands.CardCommandOutcome
+import com.doomhamsters.logic.cardcommands.CardCommandSupport
 
 class InvalidActionException(message: String) : Exception(message)
 class InvalidDrawException(message: String) : Exception(message)
 
-class GameEngine(playerIds: ArrayList<String>) {
+class GameEngine(playerIds: ArrayList<String>) : CardCommandSupport {
 
     private val gameState: GameState = GameFactory.createGame(playerIds)
 
@@ -43,6 +50,37 @@ class GameEngine(playerIds: ArrayList<String>) {
         gameState.deck.insertFromTop(card, position)
     }
 
+    fun activateCard(playerId: String, cardId: String): CardCommandOutcome {
+        val player = gameState.players.find { it.id == playerId }
+            ?: throw InvalidActionException("Player $playerId not found")
+
+        if (!player.isAlive()) throw InvalidActionException("Player $playerId is dead")
+        if (gameState.currentTurnPlayerId != playerId) {
+            throw InvalidActionException("Player $playerId cannot activate a card outside their turn")
+        }
+
+        val card = player.hand.firstOrNull { it.id == cardId }
+            ?: throw InvalidActionException("Card $cardId is not in player $playerId hand")
+        val command = CardRegistry.commandFor(card)
+            ?: throw InvalidActionException("Card ${card.type} has no activatable command")
+        val executor = command.executor
+            ?: throw InvalidActionException("Card ${card.type} has no local executor")
+
+        val outcome = executor.execute(
+            CardCommandContext(
+                gameState = gameState,
+                player = player,
+                card = card,
+                engine = this
+            )
+        )
+
+        if (outcome.endsTurn) {
+            advanceTurn()
+        }
+
+        return outcome
+    }
 
     fun advanceTurn() {
         val alivePlayers = gameState.players.filter { it.isAlive() }
@@ -58,5 +96,14 @@ class GameEngine(playerIds: ArrayList<String>) {
         gameState.currentPlayerIndex = nextIndex
     }
 
+    override fun discardFromHand(player: Player, card: Card) {
+        val removed = player.hand.remove(card)
+        if (!removed) {
+            throw InvalidActionException("Card ${card.id ?: card.type.name} is not in ${player.id} hand")
+        }
+        gameState.discard.add(card)
+    }
+
+    override fun peekTopCard(): Card? = gameState.deck.peekTop()
 
 }

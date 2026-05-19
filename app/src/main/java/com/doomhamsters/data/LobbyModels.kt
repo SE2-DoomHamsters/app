@@ -19,7 +19,9 @@ data class User(
 data class Lobby(
     val lobbyId: String = "",
     val members: List<User> = emptyList(),
-    val qrCodeBase64: String? = null
+    val qrCodeBase64: String? = null,
+    val gameId: String? = null,
+    val gameStarted: Boolean = false
 )
 /**
  * Konvertiert einen Base64-codierten String (z. B. den QR-Code vom Server)

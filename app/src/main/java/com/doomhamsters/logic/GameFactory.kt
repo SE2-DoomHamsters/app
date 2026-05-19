@@ -1,5 +1,12 @@
 package com.doomhamsters.logic
 
+/* TEMP COMMIT NOTE
+Commit with:
+Task 2 / Commit 4 - feat(cards): add self-contained card definitions and command template
+Delete this note after staging.
+*/
+
+import com.doomhamsters.cards.CardRegistry
 import com.doomhamsters.model.*
 import java.util.UUID
 
@@ -17,17 +24,17 @@ object GameFactory {
         val deck = Deck()
 
         for (i in 1..BASE_NORMAL_CARDS) {
-            deck.insertAt(Card(CardType.Normal), 0)
+            deck.insertAt(createCard(CardType.Normal), 0)
         }
 
         for (i in 1..EXTRA_SNACK_STASH_CARDS) {
-            deck.insertAt(Card(CardType.SnackStash), 0)
+            deck.insertAt(createCard(CardType.SnackStash), 0)
         }
 
         deck.shuffle()
 
         for (player in players) {
-            player.hand.add(Card(CardType.SnackStash))
+            player.hand.add(createCard(CardType.SnackStash))
             for (i in 1..INITIAL_HAND_SIZE) {
                 deck.draw()?.let { card -> player.hand.add(card) }
             }
@@ -36,7 +43,7 @@ object GameFactory {
 
         val doomCount = playerCount - 1
         for (i in 1..doomCount) {
-            deck.insertAt(Card(CardType.Doom), 0)
+            deck.insertAt(createCard(CardType.Doom), 0)
         }
         deck.shuffle()
 
@@ -47,6 +54,16 @@ object GameFactory {
             discard = Discard(),
             currentPlayerIndex = (0 until playerCount).random(), //random starting player
             status = Status.Playing
+        )
+    }
+
+    private fun createCard(type: CardType): Card {
+        val definition = CardRegistry.definitionForType(type)
+        return Card(
+            type = type,
+            id = UUID.randomUUID().toString(),
+            name = definition.displayName,
+            effectId = definition.command?.id?.name
         )
     }
 }

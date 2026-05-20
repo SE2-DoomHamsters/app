@@ -1,7 +1,5 @@
 package com.doomhamsters.viewmodel
 
-
-
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,11 +19,23 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
+
+/**
+ * Represents the live state of the STOMP/WebSocket connection
+ * Guarantees compile-tim exhaustive checks in when() expressions.
+ */
+sealed class ConnectionStatus {
+    object Connected : ConnectionStatus()
+    object Disconnected : ConnectionStatus()
+    data class Reconnecting(val attempt: Int, val maxAttempts: Int) : ConnectionStatus()
+    object Failed : ConnectionStatus()
+}
 
 /** Owns realtime game state, local Doom handling, and card actions for the game board. */
 open class GameBoardViewModel(
@@ -36,6 +46,8 @@ open class GameBoardViewModel(
 ) : ViewModel() {
     private companion object {
         val initialConnectionRetryDelaysMs = listOf(0L, 500L, 1_000L, 2_000L)
+        const val maxReconnectAttempts = 2
+        val reconnectBackoffMs = listOf(1_000L, 2_000L, 4_000L)
     }
 
     private val tag = "GameBoardViewModel"
@@ -54,6 +66,8 @@ open class GameBoardViewModel(
 
     protected val _error = MutableSharedFlow<String>()
     open val error: SharedFlow<String> = _error
+    private val _connectionStatus = MutableStateFlow<ConnectionStatus>(ConnectionStatus.Connected)
+    val connectionStatus: StateFlow<ConnectionStatus> = _connectionStatus
 
     protected val _log = MutableStateFlow<List<String>>(emptyList())
     open val log: StateFlow<List<String>> = _log
@@ -85,6 +99,7 @@ open class GameBoardViewModel(
         connectAndObserveRemoteState()
     }
 
+    /**
     private fun connectAndObserveRemoteState() {
         viewModelScope.launch {
             val connected = establishInitialConnection()
@@ -134,6 +149,77 @@ open class GameBoardViewModel(
                 _error.emit("Connection error: ${e.message}")
             }
         }
+    }**/
+    private fun connectAndObserveRemoteState() {
+        viewModelScope.launch {
+            val connected = establishInitialConnection()
+            if (!connected) {
+                _connectionStatus.value = ConnectionStatus.Failed
+                return@launch
+            }
+            subscribeWithReconnect()
+        }
+    }
+    private suspend fun subscribeWithReconnect() {
+        var attempt = 0
+        while (attempt <= maxReconnectAttempts) {
+            // --- RECONNECT PHASE (skipped on first run when attempt == 0) ---
+            if (attempt > 0) {
+                _connectionStatus.value = ConnectionStatus.Reconnecting(attempt, maxReconnectAttempts)
+                val delayMs = reconnectBackoffMs.getOrElse(attempt - 1) { reconnectBackoffMs.last()}
+                delay(delayMs) // wait 1s, 2s, 4s before trying again
+                try {
+                    runCatching { repository.disconnect() } // connection may be dead
+                    repository.connect()
+                    refreshGameState( resolvePlayerId = false ) // game state will be restored via REST Call form sessions.json
+                    _connectionStatus.value = ConnectionStatus.Connected
+                    addLog("Reconnected.")
+                } catch (e: CancellationException) {
+                    throw e // ViewModel is being destroyed
+                } catch (e: Exception) {
+                    Log.e(tag, "Reconnect attempt $attempt/$maxReconnectAttempts failed gameId=$gameId", e)
+                    attempt++
+                    continue
+                }
+            }
+            // --- SUBSCRIPTION PHASE ---
+            // coroutineScope groups all 3 launches together.
+            // If any one subscription throws (WebSocket died), coroutineScope
+            // automatically cancels the other two and re-throws the exception.
+            try {
+                coroutineScope {
+                    launch {
+                        repository.subscribeToGameState(gameId)
+                            .collect { state ->
+                                runCatching { applyGameState(state, resolvePlayerId = false) }
+                                    .onFailure { e -> Log.e(tag, "State apply error gameId=$gameId", e) }
+                            }
+                    }
+                    launch {
+                        repository.subscribeToGame(gameId)
+                            .collect { payload ->
+                                runCatching { JSONObject(payload) }.getOrNull()
+                                    ?.let { event -> runCatching { handlePublicGameEvent(event) }}
+                            }
+                    }
+                    launch {
+                        repository.subscribeToPrivateEvents(gameId, localPlayerId)
+                            .collect { event -> runCatching { handlePrivateEvent(event) } }
+                    }
+                }
+                return //coroutineScope completed normally (connection closed cleanly)
+            } catch (e: CancellationException) {
+                throw e // ViewModel destroyed
+            } catch (e: Exception) {
+                Log.w(tag, "Subscription lost attempt=$attempt/$maxReconnectAttempts gameId=$gameId", e)
+                _connectionStatus.value = ConnectionStatus.Disconnected
+                attempt++
+            }
+        }
+        // All reconnect attempts exhausted
+        Log.e(tag, "Max reconnect attempts exhausted gameId=$gameId")
+        _connectionStatus.value = ConnectionStatus.Failed
+        _error.emit("The hamster died of heart attack. RIP... Please restart the game.")
     }
 
     private suspend fun establishInitialConnection(): Boolean {

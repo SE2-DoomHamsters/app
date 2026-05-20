@@ -99,6 +99,26 @@ class GameRepository(
         }
     }
 
+    /**
+     * Fetches the game state, returning null if the game does not exist (HTTP 404).
+     * Throws for other errors (network failure, server error, etc.).
+     */
+    suspend fun fetchGameStateOrNull(gameId: String, playerId: String): GameState? {
+        Log.d(tag, "REST check /api/game/$gameId/state?playerId=$playerId")
+        val request = Request.Builder()
+            .url("http://$baseUrl/api/game/$gameId/state?playerId=$playerId")
+            .get()
+            .build()
+
+        return withContext(Dispatchers.IO) {
+            httpClient.newCall(request).execute().use { response ->
+                if (response.code == 404) return@withContext null
+                check(response.isSuccessful) { "Game state fetch failed: ${response.code}" }
+                GameState.fromBackendJson(JSONObject(response.body!!.string()))
+            }
+        }
+    }
+
     /** Sends a game action payload to the backend. */
     suspend fun sendAction(gameId: String, action: String, payload: JSONObject) {
         Log.d(tag, "STOMP send action gameId=$gameId action=$action payload=$payload")

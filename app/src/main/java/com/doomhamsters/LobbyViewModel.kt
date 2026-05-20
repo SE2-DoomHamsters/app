@@ -12,6 +12,7 @@ import androidx.lifecycle.viewModelScope
 import com.doomhamsters.data.GameSession
 import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
+import com.doomhamsters.model.Status
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
@@ -43,6 +44,10 @@ class LobbyViewModel(
     }
 
     private val userId: String = sessionStore.getOrCreateUserId()
+
+    init {
+        viewModelScope.launch { tryResumeActiveGame() }
+    }
 
     var currentStep by mutableIntStateOf(1)
     var groupName by mutableStateOf(generateLobbyName())
@@ -83,6 +88,43 @@ class LobbyViewModel(
     private var lastCompletedGameId: String? = null
     val currentUserId: String
         get() = userId
+
+    /**
+     * Checks whether a previous game session was saved and is still active on the backend.
+     * If so, skips the lobby flow and navigates directly to the game board (step 4).
+     * On a 404 or finished game the saved session is cleared.
+     * On a network error the saved session is kept so the next launch can retry.
+     */
+    private suspend fun tryResumeActiveGame() {
+        val savedGameId = sessionStore.loadActiveGameId() ?: return
+        val playerName = sessionStore.loadUsername() ?: return
+        val gameRepo = GameRepository(BackendConfig.BASE_URL)
+        val state = try {
+            gameRepo.fetchGameStateOrNull(savedGameId, userId)
+        } catch (e: Exception) {
+            Log.d(TAG, "Could not verify saved game $savedGameId (network?): ${e.message}")
+            return
+        }
+        if (state == null || state.status == Status.Finished) {
+            sessionStore.clearActiveGame()
+            return
+        }
+        sessionStore.loadActiveLobbyId()?.let { savedLobbyId ->
+            observedLobbyId = savedLobbyId
+            try {
+                repository.getLobby(savedLobbyId)?.let { lobby -> _lobby.value = lobby }
+            } catch (e: Exception) {
+                Log.d(TAG, "Could not load lobby $savedLobbyId on resume: ${e.message}")
+            }
+        }
+        _activeGameSession.value = GameSession(
+            gameId = savedGameId,
+            playerId = userId,
+            playerName = playerName
+        )
+        currentStep = 4
+        Log.d(TAG, "Resumed active game $savedGameId for player $userId")
+    }
 
     /** Creates a lobby with the currently entered profile details. */
     fun createGroup() {
@@ -193,11 +235,12 @@ class LobbyViewModel(
             TAG,
             "Returning to lobby from game=${_activeGameSession.value?.gameId}, lobby=${_lobby.value?.lobbyId}"
         )
+        sessionStore.clearActiveGame()
         lastCompletedGameId = _activeGameSession.value?.gameId
         _activeGameSession.value = null
-        currentStep = 3
         val lobbyIdToResume = _lobby.value?.lobbyId ?: observedLobbyId
         if (!lobbyIdToResume.isNullOrBlank()) {
+            currentStep = 3
             viewModelScope.launch {
                 try {
                     observeLobby(lobbyIdToResume)
@@ -205,6 +248,8 @@ class LobbyViewModel(
                     Log.d(TAG, "Failed to resume lobby observation for $lobbyIdToResume: ${error.message}")
                 }
             }
+        } else {
+            currentStep = 1
         }
     }
 
@@ -324,6 +369,7 @@ class LobbyViewModel(
             playerId = userId,
             playerName = username
         )
+        sessionStore.saveActiveGameId(startedGameId, lobby.lobbyId)
         _activeGameSession.value = session
         currentStep = 4
         viewModelScope.launch {

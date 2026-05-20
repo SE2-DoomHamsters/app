@@ -3,12 +3,16 @@ package com.doomhamsters
 import android.content.Context
 import java.util.UUID
 
-/** Persists the local player identity and profile details. */
+/** Persists the local player identity, profile details, and active game session. */
 interface SessionStore {
     fun getOrCreateUserId(): String
     fun loadUsername(): String?
     fun loadAvatar(): String?
     fun saveProfile(username: String, avatar: String)
+    fun saveActiveGameId(gameId: String, lobbyId: String?)
+    fun loadActiveGameId(): String?
+    fun loadActiveLobbyId(): String?
+    fun clearActiveGame()
 }
 
 /** SharedPreferences-backed session store for local player identity and profile details. */
@@ -40,10 +44,30 @@ class SharedPrefsSessionStore(context: Context) : SessionStore {
             .apply()
     }
 
+    override fun saveActiveGameId(gameId: String, lobbyId: String?) {
+        prefs.edit()
+            .putString(KEY_ACTIVE_GAME_ID, gameId)
+            .putString(KEY_ACTIVE_LOBBY_ID, lobbyId)
+            .apply()
+    }
+
+    override fun loadActiveGameId(): String? = prefs.getString(KEY_ACTIVE_GAME_ID, null)
+
+    override fun loadActiveLobbyId(): String? = prefs.getString(KEY_ACTIVE_LOBBY_ID, null)
+
+    override fun clearActiveGame() {
+        prefs.edit()
+            .remove(KEY_ACTIVE_GAME_ID)
+            .remove(KEY_ACTIVE_LOBBY_ID)
+            .apply()
+    }
+
     private companion object {
         const val PREFS_NAME = "doomhamsters.session"
         const val KEY_USER_ID = "user_id"
         const val KEY_USERNAME = "username"
         const val KEY_AVATAR = "avatar"
+        const val KEY_ACTIVE_GAME_ID = "active_game_id"
+        const val KEY_ACTIVE_LOBBY_ID = "active_lobby_id"
     }
 }

@@ -1,27 +1,32 @@
 package com.doomhamsters
+
 import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
+import io.mockk.Runs
 import io.mockk.coEvery
+import io.mockk.coVerifyOrder
 import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.Runs
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class LobbyViewModelTest {
 
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -31,7 +36,15 @@ class LobbyViewModelTest {
 
     private val fakeLobby = Lobby(
         lobbyId = "DOOMUNIT",
-        members = listOf(User("fixed-id", "Christian", "🐱")),
+        members = listOf(User("fixed-id", "Christian", "hamster")),
+        qrCodeBase64 = "base64qr=="
+    )
+    private val startableLobby = Lobby(
+        lobbyId = "DOOMUNIT",
+        members = listOf(
+            User("fixed-id", "Christian", "hamster"),
+            User("guest-id", "Anna", "dog")
+        ),
         qrCodeBase64 = "base64qr=="
     )
 
@@ -39,32 +52,34 @@ class LobbyViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
         mockRepo = mockk(relaxed = true)
-        gameStartFlow = MutableSharedFlow<String>()
+        gameStartFlow = MutableSharedFlow()
         coEvery { mockRepo.subscribeGameStart(any()) } returns gameStartFlow
-        viewModel = LobbyViewModel(repository = mockRepo, userId = "fixed-id")
+        viewModel = LobbyViewModel(
+            repository = mockRepo,
+            userId = "fixed-id",
+            enableLobbyRefresh = false
+        )
     }
 
     @AfterEach
     fun tearDown() {
+        LobbyViewModel::class.java.getDeclaredMethod("onCleared")
+            .apply { isAccessible = true }
+            .invoke(viewModel)
         Dispatchers.resetMain()
     }
 
-    // ── initial state ─────────────────────────────────────────────────────────
-
     @Test
-    fun `initialer Status ist korrekt`() {
+    fun `initial status is correct`() {
         assertEquals(1, viewModel.currentStep)
-        assertEquals("", viewModel.username)
-        assertEquals("", viewModel.groupName)
         assertEquals("dog", viewModel.selectedAvatar)
         assertNull(viewModel.lobby.value)
         assertNull(viewModel.error.value)
+        assertNull(viewModel.activeGameSession.value)
     }
 
-    // ── createGroup ───────────────────────────────────────────────────────────
-
     @Test
-    fun `createGroup macht nichts wenn username leer ist`() = runTest {
+    fun `createGroup does nothing when username is blank`() = runTest {
         viewModel.groupName = "DoomUnit"
         viewModel.username = ""
 
@@ -75,7 +90,7 @@ class LobbyViewModelTest {
     }
 
     @Test
-    fun `createGroup macht nichts wenn groupName leer ist`() = runTest {
+    fun `createGroup does nothing when groupName is blank`() = runTest {
         viewModel.username = "Christian"
         viewModel.groupName = ""
 
@@ -85,42 +100,43 @@ class LobbyViewModelTest {
     }
 
     @Test
-    fun `createGroup wechselt zu Step 3 bei erfolgreicher Netzwerkantwort`() = runTest {
+    fun `createGroup switches to step 3 on success`() = runTest {
         coEvery { mockRepo.connect() } just Runs
         coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
         coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
 
         viewModel.username = "Christian"
         viewModel.groupName = "DoomUnit"
-        viewModel.selectedAvatar = "🐱"
+        viewModel.selectedAvatar = "hamster"
 
         viewModel.createGroup()
 
         assertEquals(3, viewModel.currentStep)
         assertEquals(fakeLobby, viewModel.lobby.value)
         assertNull(viewModel.error.value)
+        assertFalse(viewModel.isProfileActionInProgress)
     }
 
     @Test
-    fun `createGroup sendet korrekten User an Repository`() = runTest {
+    fun `createGroup sends correct user to repository`() = runTest {
         coEvery { mockRepo.connect() } just Runs
         coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
         coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
 
         viewModel.username = "Christian"
         viewModel.groupName = "DoomUnit"
-        viewModel.selectedAvatar = "🐱"
+        viewModel.selectedAvatar = "hamster"
 
         viewModel.createGroup()
 
         coVerify {
-            mockRepo.createLobby("DoomUnit", User("fixed-id", "Christian", "🐱"))
+            mockRepo.createLobby("DoomUnit", User("fixed-id", "Christian", "hamster"))
         }
     }
 
     @Test
-    fun `createGroup setzt Fehlermeldung bei Netzwerkfehler`() = runTest {
-        coEvery { mockRepo.connect() } throws RuntimeException("No network")
+    fun `createGroup sets error on network failure`() = runTest {
+        coEvery { mockRepo.createLobby(any(), any()) } throws RuntimeException("No network")
 
         viewModel.username = "Christian"
         viewModel.groupName = "DoomUnit"
@@ -132,7 +148,7 @@ class LobbyViewModelTest {
     }
 
     @Test
-    fun `lobby wird aktualisiert wenn Subscription neue Daten sendet`() = runTest {
+    fun `lobby updates refresh member list`() = runTest {
         val lobbyFlow = MutableSharedFlow<Lobby>()
         coEvery { mockRepo.connect() } just Runs
         coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
@@ -141,22 +157,43 @@ class LobbyViewModelTest {
         viewModel.username = "Christian"
         viewModel.groupName = "DoomUnit"
         viewModel.createGroup()
+        advanceUntilIdle()
 
         val updatedLobby = fakeLobby.copy(
             members = listOf(
-                User("fixed-id", "Christian", "🐱"),
-                User("u2", "Gast", "🐶")
+                User("fixed-id", "Christian", "hamster"),
+                User("u2", "Gast", "dog")
             )
         )
         lobbyFlow.emit(updatedLobby)
+        advanceUntilIdle()
 
         assertEquals(2, viewModel.lobby.value?.members?.size)
     }
-    // ── joinLobby ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `joinLobby zeigt Fehler wenn username leer ist`() = runTest {
-        viewModel.username = "" // Name fehlt
+    fun `lobby update with game id moves waiting clients into game`() = runTest {
+        val lobbyFlow = MutableSharedFlow<Lobby>()
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.joinLobby(any(), any()) } returns fakeLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns lobbyFlow
+
+        viewModel.username = "Anna"
+        viewModel.selectedAvatar = "hamster"
+
+        viewModel.joinLobby("DOOMUNIT")
+        advanceUntilIdle()
+
+        lobbyFlow.emit(fakeLobby.copy(gameId = "shared-game-1", gameStarted = true))
+        advanceUntilIdle()
+
+        assertEquals(4, viewModel.currentStep)
+        assertEquals("shared-game-1", viewModel.activeGameSession.value?.gameId)
+    }
+
+    @Test
+    fun `joinLobby shows error when username is blank`() = runTest {
+        viewModel.username = ""
 
         viewModel.joinLobby("DOOMUNIT")
 
@@ -166,13 +203,13 @@ class LobbyViewModelTest {
     }
 
     @Test
-    fun `joinLobby wechselt zu Step 3 bei erfolgreichem Beitritt`() = runTest {
+    fun `joinLobby switches to step 3 on success`() = runTest {
         coEvery { mockRepo.connect() } just Runs
         coEvery { mockRepo.joinLobby(any(), any()) } returns fakeLobby
         coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
 
         viewModel.username = "Anna"
-        viewModel.selectedAvatar = "🐱"
+        viewModel.selectedAvatar = "hamster"
 
         viewModel.joinLobby("DOOMUNIT")
 
@@ -180,16 +217,54 @@ class LobbyViewModelTest {
         assertEquals(fakeLobby, viewModel.lobby.value)
         assertNull(viewModel.error.value)
 
-        // Prüfen, ob die richtigen Daten ans Repository geschickt wurden
         coVerify {
-            mockRepo.joinLobby("DOOMUNIT", User("fixed-id", "Anna", "🐱"))
+            mockRepo.joinLobby("DOOMUNIT", User("fixed-id", "Anna", "hamster"))
         }
     }
 
     @Test
-    fun `joinLobby zeigt Fehler wenn Lobby nicht existiert`() = runTest {
+    fun `joinLobby keeps step 4 when joined lobby is already started`() = runTest {
         coEvery { mockRepo.connect() } just Runs
-        // Simulieren: Backend findet die Lobby nicht und gibt null zurück
+        coEvery { mockRepo.joinLobby(any(), any()) } returns fakeLobby.copy(
+            gameId = "shared-game-1",
+            gameStarted = true
+        )
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+
+        viewModel.username = "Anna"
+        viewModel.selectedAvatar = "hamster"
+
+        viewModel.joinLobby("DOOMUNIT")
+        advanceUntilIdle()
+
+        assertEquals(4, viewModel.currentStep)
+        assertEquals("shared-game-1", viewModel.activeGameSession.value?.gameId)
+    }
+
+    @Test
+    fun `joinLobby connects before sending join request and starts subscriptions`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.joinLobby(any(), any()) } returns fakeLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+        coEvery { mockRepo.subscribeGameStart(any()) } returns emptyFlow()
+
+        viewModel.username = "Anna"
+        viewModel.selectedAvatar = "hamster"
+
+        viewModel.joinLobby("DOOMUNIT")
+        advanceUntilIdle()
+
+        coVerifyOrder {
+            mockRepo.connect()
+            mockRepo.joinLobby("DOOMUNIT", User("fixed-id", "Anna", "hamster"))
+        }
+        coVerify(atLeast = 1) { mockRepo.subscribeLobbyUpdates("DOOMUNIT") }
+        coVerify(atLeast = 1) { mockRepo.subscribeGameStart("DOOMUNIT") }
+    }
+
+    @Test
+    fun `joinLobby shows error when lobby does not exist`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
         coEvery { mockRepo.joinLobby(any(), any()) } returns null
 
         viewModel.username = "Anna"
@@ -197,13 +272,13 @@ class LobbyViewModelTest {
         viewModel.joinLobby("FALSCHE_LOBBY")
 
         assertEquals("Lobby 'FALSCHE_LOBBY' wurde nicht gefunden!", viewModel.error.value)
-        assertEquals(1, viewModel.currentStep) // Bleibt im Startbildschirm
+        assertEquals(1, viewModel.currentStep)
     }
 
     @Test
-    fun `joinLobby fängt Netzwerkfehler ab`() = runTest {
-        // Simulieren: Server ist offline
-        coEvery { mockRepo.connect() } throws RuntimeException("Server down")
+    fun `joinLobby catches network errors`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.joinLobby(any(), any()) } throws RuntimeException("Server down")
 
         viewModel.username = "Anna"
 
@@ -213,77 +288,159 @@ class LobbyViewModelTest {
         assertEquals(1, viewModel.currentStep)
     }
 
-    // ── startGame ─────────────────────────────────────────────────────────────
-
     @Test
-    fun `startGame wechselt zu Step 4`() = runTest {
+    fun `startGame moves to step 4 when start signal arrives`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.disconnect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns startableLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+
         viewModel.username = "Hamster1"
         viewModel.groupName = "TestGruppe"
         viewModel.createGroup()
         advanceUntilIdle()
+
         gameStartFlow.emit("neue-game-uuid")
         advanceUntilIdle()
+
+        assertEquals(4, viewModel.currentStep)
+        assertEquals("neue-game-uuid", viewModel.activeGameSession.value?.gameId)
+    }
+
+    @Test
+    fun `entering game disconnects lobby observers`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.disconnect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns startableLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+
+        viewModel.username = "Hamster1"
+        viewModel.groupName = "TestGruppe"
+        viewModel.createGroup()
+        advanceUntilIdle()
+
+        gameStartFlow.emit("neue-game-uuid")
+        advanceUntilIdle()
+
+        coVerify(atLeast = 1) { mockRepo.disconnect() }
         assertEquals(4, viewModel.currentStep)
     }
+
     @Test
-    fun `startGame ruft triggerGameStart im Repository auf`() = runTest {
-        //  Setup
+    fun `startGame calls triggerGameStart in repository`() = runTest {
         coEvery { mockRepo.connect() } just Runs
-        coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
+        coEvery { mockRepo.disconnect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns startableLobby
         coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
         coEvery { mockRepo.subscribeGameStart(any()) } returns emptyFlow()
+        coEvery { mockRepo.getLobby(any()) } returns
+            startableLobby.copy(
+                gameId = "game-1",
+                gameStarted = true
+        )
 
-        // Daten setzen
         viewModel.username = "Christian"
         viewModel.groupName = "DoomUnit"
-
-        // Lobby erstellen
         viewModel.createGroup()
+        runCurrent()
 
-        //Start-Knopf drücken
         viewModel.startGame()
+        advanceUntilIdle()
 
-        //Verifizieren
-        coVerify { mockRepo.triggerGameStart("DOOMUNIT") }
+        coVerify { mockRepo.triggerGameStart("DOOMUNIT", "fixed-id") }
+        assertFalse(viewModel.isStartingGame)
     }
+
     @Test
-    fun `Navigation wird getriggert wenn Server das Start-Signal sendet`() = runTest {
-        // Setup
-        val gameStartFlow = MutableSharedFlow<String>()
+    fun `active game session is set when server sends start signal`() = runTest {
+        val startFlow = MutableSharedFlow<String>()
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns startableLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+        coEvery { mockRepo.subscribeGameStart(any()) } returns startFlow
+
+        viewModel.username = "Christian"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+
+        startFlow.emit("MEINE_TEST_UUID")
+        advanceUntilIdle()
+
+        assertEquals(4, viewModel.currentStep)
+        assertEquals("MEINE_TEST_UUID", viewModel.activeGameSession.value?.gameId)
+        assertEquals("fixed-id", viewModel.activeGameSession.value?.playerId)
+    }
+
+    @Test
+    fun `returnToLobbyAfterGame clears active session and keeps lobby screen`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.disconnect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns startableLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+
+        viewModel.username = "Christian"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+
+        gameStartFlow.emit("MEINE_TEST_UUID")
+        advanceUntilIdle()
+
+        viewModel.returnToLobbyAfterGame()
+        advanceUntilIdle()
+
+        assertEquals(3, viewModel.currentStep)
+        assertNull(viewModel.activeGameSession.value)
+        coVerify(atLeast = 2) { mockRepo.connect() }
+    }
+
+    @Test
+    fun `startGame is blocked until at least two players are present`() = runTest {
         coEvery { mockRepo.connect() } just Runs
         coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
         coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
-        coEvery { mockRepo.subscribeGameStart(any()) } returns gameStartFlow
 
-        // Beobachten des Navigationsflows in einer Liste
-        val navEvents = mutableListOf<Pair<String, String>>()
-        val collectJob = launch(UnconfinedTestDispatcher(testScheduler)) {
-            viewModel.navigateToGame.collect { navEvents.add(it) }
-        }
-
-        // Lobby erstellen
         viewModel.username = "Christian"
         viewModel.groupName = "DoomUnit"
         viewModel.createGroup()
+        advanceUntilIdle()
 
-        // Der Server schickt die Game-ID über den Kanal
-        gameStartFlow.emit("MEINE_TEST_UUID")
+        viewModel.startGame()
 
-        // Event bei der Ui angekommen?
-        assertEquals(1, navEvents.size)
-        assertEquals("MEINE_TEST_UUID", navEvents[0].first) // gameId
-        assertEquals("fixed-id", navEvents[0].second)        // userId
-
-        collectJob.cancel()
+        coVerify(exactly = 0) { mockRepo.triggerGameStart(any(), any()) }
+        assertEquals("Mindestens 2 Spieler werden zum Starten benotigt.", viewModel.error.value)
     }
 
-    // ── onCleared ─────────────────────────────────────────────────────────────
+    @Test
+    fun `startGame stays blocked until current player is part of lobby members`() = runTest {
+        val otherPlayersLobby = Lobby(
+            lobbyId = "DOOMUNIT",
+            members = listOf(
+                User("guest-id", "Anna", "dog"),
+                User("guest-2", "Chris", "fox")
+            ),
+            qrCodeBase64 = "base64qr=="
+        )
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns otherPlayersLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+
+        viewModel.username = "Christian"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+
+        viewModel.startGame()
+
+        coVerify(exactly = 0) { mockRepo.triggerGameStart(any(), any()) }
+        assertEquals("Warte auf die Lobby-Synchronisierung.", viewModel.error.value)
+    }
 
     @Test
-    fun `onCleared ruft disconnect auf`() = runTest {
+    fun `onCleared calls disconnect`() = runTest {
         coEvery { mockRepo.disconnect() } just Runs
 
-        // onCleared() is protected in ViewModel — invoke via reflection
         LobbyViewModel::class.java.getDeclaredMethod("onCleared")
             .apply { isAccessible = true }
             .invoke(viewModel)

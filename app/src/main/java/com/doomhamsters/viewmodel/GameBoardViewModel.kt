@@ -46,7 +46,7 @@ open class GameBoardViewModel(
 ) : ViewModel() {
     private companion object {
         val initialConnectionRetryDelaysMs = listOf(0L, 500L, 1_000L, 2_000L)
-        const val maxReconnectAttempts = 2
+        const val maxReconnectAttempts = 3
         val reconnectBackoffMs = listOf(1_000L, 2_000L, 4_000L)
     }
 

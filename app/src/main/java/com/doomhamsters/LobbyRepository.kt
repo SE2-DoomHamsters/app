@@ -178,6 +178,24 @@ class LobbyRepository(
                 Log.d(TAG, "STOMP /topic/game/$lobbyId start payload: $jsonString")
                 JSONObject(jsonString).getString("gameId")
             }
+
+    suspend fun leaveLobby(lobbyId: String, userId: String) {
+        val body = JSONObject().put("userId", userId).toString()
+            .toRequestBody("application/json".toMediaType())
+
+        val request = Request.Builder()
+            .url("http://$baseUrl/api/lobby/$lobbyId/leave")
+            .post(body)
+            .build()
+
+        withContext(Dispatchers.IO) {
+            httpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    println("Leave lobby failed: ${response.code}")
+                }
+            }
+        }
+    }
 }
 
 private fun User.toJson() = JSONObject()

@@ -362,6 +362,15 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
         ) {
             Text(if (viewModel.isStartingGame) "STARTE SPIEL..." else "Spiel fur alle starten")
         }
+
+        Spacer (Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = { viewModel.leaveLobby() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.leave_lobby_text))
+        }
     }
 }
 

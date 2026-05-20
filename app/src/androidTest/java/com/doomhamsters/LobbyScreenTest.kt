@@ -3,6 +3,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.doomhamsters.ui.lobby.MainLobbyNavigation
 import org.junit.Rule
 import org.junit.Test
 
@@ -128,6 +129,25 @@ class LobbyScreenTest {
         // Zur Sicherheit getestet, ob Der "Gruppe erstellen"-Button weiterhin deaktiviert ist
         //, weil dafür der Gruppenname zwingend nötig ist.
         composeTestRule.onNodeWithText("Gruppe erstellen").assertIsNotEnabled()
+    }
+
+    @Test
+    fun leave_lobby_returns_to_start_screen() {
+        composeTestRule.setContent {
+            val testViewModel: LobbyViewModel = viewModel()
+            testViewModel.username = "Hamster1"
+            testViewModel.currentStep = 3
+            MainLobbyNavigation(testViewModel)
+        }
+
+        // prüft, ob Button da ist
+        composeTestRule.onNodeWithText("LOBBY VERLASSEN").assertIsDisplayed()
+
+        // klickt den Button
+        composeTestRule.onNodeWithText("LOBBY VERLASSEN").performClick()
+
+        // prüft, ob wir wieder am Startbildschirm sind
+        composeTestRule.onNodeWithText("Willkommen bei", substring = true).assertIsDisplayed()
     }
 }
 

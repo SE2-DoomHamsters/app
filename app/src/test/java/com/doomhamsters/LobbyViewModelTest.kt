@@ -469,22 +469,7 @@ class LobbyViewModelTest {
             .invoke(resumedViewModel)
     }
 
-    private class FakeSessionStore(
-        private val userId: String,
-        private var username: String? = null,
-        private var avatar: String? = null
-    ) : SessionStore {
-        override fun getOrCreateUserId(): String = userId
-        override fun loadUsername(): String? = username
-        override fun loadAvatar(): String? = avatar
-        override fun saveProfile(username: String, avatar: String) {
-            this.username = username
-            this.avatar = avatar
-        }
-        override fun saveActiveGameId(gameId: String, lobbyId: String?) {}
-        override fun loadActiveGameId(): String? = null
-        override fun loadActiveLobbyId(): String? = null
-        override fun clearActiveGame() {}
+    @Test
     fun `leaveLobby calls repository and resets state`() = runTest {
         coEvery { mockRepo.connect() } just Runs
         coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
@@ -520,5 +505,23 @@ class LobbyViewModelTest {
 
         assertEquals(1, viewModel.currentStep)
         assertNull(viewModel.lobby.value)
+    }
+
+    private class FakeSessionStore(
+        private val userId: String,
+        private var username: String? = null,
+        private var avatar: String? = null
+    ) : SessionStore {
+        override fun getOrCreateUserId(): String = userId
+        override fun loadUsername(): String? = username
+        override fun loadAvatar(): String? = avatar
+        override fun saveProfile(username: String, avatar: String) {
+            this.username = username
+            this.avatar = avatar
+        }
+        override fun saveActiveGameId(gameId: String, lobbyId: String?) {}
+        override fun loadActiveGameId(): String? = null
+        override fun loadActiveLobbyId(): String? = null
+        override fun clearActiveGame() {}
     }
 }

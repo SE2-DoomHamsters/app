@@ -1,0 +1,211 @@
+package com.doomhamsters.viewmodel
+
+import com.doomhamsters.GameRepository
+import com.doomhamsters.model.GameState
+import com.doomhamsters.model.Player
+import com.doomhamsters.model.Status
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.Runs
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import java.io.IOException
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class GameBoardViewModelReconnectTest {
+
+    private val testDispatcher = UnconfinedTestDispatcher()
+    private lateinit var repository: GameRepository
+    private val createdViewModels = mutableListOf<GameBoardViewModel>()
+
+    @BeforeEach
+    fun setUp() {
+        Dispatchers.setMain(testDispatcher)
+        repository = mockk(relaxed = true)
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.disconnect() } just Runs
+        coEvery { repository.fetchGameState(any(), any()) } returns defaultGameState()
+        coEvery { repository.subscribeToGameState(any()) } returns emptyFlow()
+        coEvery { repository.subscribeToGame(any()) } returns emptyFlow()
+        coEvery { repository.subscribeToPrivateEvents(any(), any()) } returns emptyFlow()
+    }
+
+    @AfterEach
+    fun tearDown() {
+        createdViewModels.forEach(::clearViewModel)
+        createdViewModels.clear()
+        Dispatchers.resetMain()
+    }
+
+    @Test
+    fun `connection status is Connected after successful initial setup`() = runTest {
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionStatus.Connected, vm.connectionStatus.value)
+    }
+
+    @Test
+    fun `status is Reconnecting after a subscription failure`() = runTest {
+        coEvery { repository.subscribeToGameState(any()) } returns flow {
+            throw IOException("dropped")
+        }
+        val connectBarrier = CompletableDeferred<Unit>()
+        var connectCount = 0
+        coEvery { repository.connect() } coAnswers {
+            connectCount++
+            if (connectCount > 1) connectBarrier.await()
+        }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionStatus.Reconnecting(1, 3), vm.connectionStatus.value)
+        connectBarrier.complete(Unit)
+    }
+
+    @Test
+    fun `status returns to Connected after a successful reconnect`() = runTest {
+        var subscribeCount = 0
+        coEvery { repository.subscribeToGameState(any()) } answers {
+            subscribeCount++
+            if (subscribeCount == 1) flow { throw IOException("dropped") } else emptyFlow()
+        }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionStatus.Connected, vm.connectionStatus.value)
+    }
+
+    @Test
+    fun `attempt number increments when reconnect itself fails`() = runTest {
+        coEvery { repository.subscribeToGameState(any()) } returns flow {
+            throw IOException("dropped")
+        }
+        val secondReconnectBarrier = CompletableDeferred<Unit>()
+        var connectCount = 0
+        coEvery { repository.connect() } coAnswers {
+            connectCount++
+            when (connectCount) {
+                1 -> Unit
+                2 -> throw IOException("still down")
+                else -> secondReconnectBarrier.await()
+            }
+        }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionStatus.Reconnecting(2, 3), vm.connectionStatus.value)
+        secondReconnectBarrier.complete(Unit)
+    }
+
+    @Test
+    fun `status becomes Failed after all reconnect attempts are exhausted`() = runTest {
+        coEvery { repository.subscribeToGameState(any()) } returns flow {
+            throw IOException("dropped")
+        }
+        var connectCount = 0
+        coEvery { repository.connect() } coAnswers {
+            connectCount++
+            if (connectCount > 1) throw IOException("server down")
+        }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionStatus.Failed, vm.connectionStatus.value)
+    }
+
+    @Test
+    fun `status becomes Failed when initial connection cannot be established`() = runTest {
+        coEvery { repository.connect() } throws IOException("no route to host")
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionStatus.Failed, vm.connectionStatus.value)
+    }
+
+    @Test
+    fun `game state is fetched from REST after reconnect to restore state`() = runTest {
+        var subscribeCount = 0
+        coEvery { repository.subscribeToGameState(any()) } answers {
+            subscribeCount++
+            if (subscribeCount == 1) flow { throw IOException("dropped") } else emptyFlow()
+        }
+
+        createViewModel()
+        advanceUntilIdle()
+
+        coVerify(atLeast = 2) { repository.fetchGameState(any(), any()) }
+    }
+
+    @Test
+    fun `disconnect is called on the repository before each reconnect attempt`() = runTest {
+        var subscribeCount = 0
+        coEvery { repository.subscribeToGameState(any()) } answers {
+            subscribeCount++
+            if (subscribeCount == 1) flow { throw IOException("dropped") } else emptyFlow()
+        }
+
+        createViewModel()
+        advanceUntilIdle()
+
+        coVerify(atLeast = 1) { repository.disconnect() }
+    }
+
+    @Test
+    fun `reconnected log message appears after recovery`() = runTest {
+        var subscribeCount = 0
+        coEvery { repository.subscribeToGameState(any()) } answers {
+            subscribeCount++
+            if (subscribeCount == 1) flow { throw IOException("dropped") } else emptyFlow()
+        }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertTrue(vm.log.value.contains("Reconnected."))
+    }
+
+    private fun defaultGameState() = GameState(
+        id = "game-1",
+        players = arrayListOf(
+            Player(id = "player-1", lives = 3, name = "Astrobot"),
+            Player(id = "player-2", lives = 3, name = "JustABot")
+        ),
+        currentPlayerIndex = 0,
+        status = Status.Playing,
+        currentPlayerId = "player-1"
+    )
+
+    private fun createViewModel() = GameBoardViewModel(
+        gameId = "game-1",
+        initialLocalPlayerId = "player-1",
+        localPlayerName = "Astrobot",
+        repository = repository
+    ).also(createdViewModels::add)
+
+    private fun clearViewModel(viewModel: GameBoardViewModel) {
+        GameBoardViewModel::class.java.getDeclaredMethod("onCleared")
+            .apply { isAccessible = true }
+            .invoke(viewModel)
+    }
+}

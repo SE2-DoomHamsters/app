@@ -273,13 +273,19 @@ class LobbyViewModel(
 
     private fun launchLobbyUpdates(lobbyId: String) {
         lobbyUpdatesJob = viewModelScope.launch {
-            repository.subscribeLobbyUpdates(lobbyId)
-                .catch { error ->
-                    Log.d(TAG, "Lobby updates failed for $lobbyId: ${error.message}")
-                    _infoMessage.value = "Verbindung wird im Hintergrund aktualisiert..."
-                    observedLobbyId = null
-                }
-                .collect(::applyLobbySnapshot)
+            try {
+                repository.subscribeLobbyUpdates(lobbyId)
+                    .catch { error ->
+                        Log.d(TAG, "Lobby updates failed for $lobbyId: ${error.message}")
+                        _infoMessage.value = "Verbindung wird im Hintergrund aktualisiert..."
+                        observedLobbyId = null
+                    }
+                    .collect(::applyLobbySnapshot)
+            } catch (e: Exception) {
+                Log.d(TAG, "Lobby updates setup failed for $lobbyId: ${e.message}")
+                _infoMessage.value = "Verbindung wird im Hintergrund aktualisiert..."
+                observedLobbyId = null
+            }
         }
         lobbyUpdatesJob?.invokeOnCompletion { error ->
             Log.d(

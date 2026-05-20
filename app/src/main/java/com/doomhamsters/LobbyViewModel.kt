@@ -156,6 +156,24 @@ class LobbyViewModel(
         }
     }
 
+    fun leaveLobby() {
+        val lobbyId = _lobby.value?.lobbyId
+        viewModelScope.launch {
+            try {
+                if (lobbyId != null) {
+                    repository.leaveLobby(lobbyId, userId)
+                }
+            } catch (e: Exception) {
+
+            } finally {
+                lobbyUpdatesJob?.cancel()
+                repository.disconnect()
+                _lobby.value = null
+                currentStep = 1
+            }
+        }
+    }
+
     /** Requests game start when the current lobby is ready. */
     fun startGame() {
         val currentLobbyId = _lobby.value?.lobbyId ?: return

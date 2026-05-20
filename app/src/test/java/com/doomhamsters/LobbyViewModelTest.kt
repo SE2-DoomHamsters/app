@@ -22,7 +22,6 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -446,5 +445,43 @@ class LobbyViewModelTest {
             .invoke(viewModel)
 
         coVerify { mockRepo.disconnect() }
+    }
+
+    @Test
+    fun `leaveLobby calls repository and resets state`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+
+        viewModel.username = "Michelle"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+        assertEquals(3, viewModel.currentStep)
+
+        viewModel.leaveLobby()
+        advanceUntilIdle()
+
+        coVerify { mockRepo.leaveLobby("DOOMUNIT", "fixed-id") }
+        coVerify { mockRepo.disconnect() }
+        assertNull(viewModel.lobby.value)
+        assertEquals(1, viewModel.currentStep)
+    }
+
+    @Test
+    fun `leaveLobby resets state even on network error`() = runTest {
+        coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
+        viewModel.username = "Michelle"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+
+        coEvery { mockRepo.leaveLobby(any(), any()) } throws RuntimeException("Network error")
+
+        viewModel.leaveLobby()
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.currentStep)
+        assertNull(viewModel.lobby.value)
     }
 }

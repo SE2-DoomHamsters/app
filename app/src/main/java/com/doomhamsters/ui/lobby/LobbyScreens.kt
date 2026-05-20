@@ -442,6 +442,15 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
                 Text("Spiel für alle starten")
             }
         }
+
+        Spacer (Modifier.height(8.dp))
+
+        OutlinedButton(
+            onClick = { viewModel.leaveLobby() },
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(stringResource(R.string.leave_lobby_text))
+        }
     }
 }
 

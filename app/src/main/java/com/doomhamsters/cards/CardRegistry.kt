@@ -12,6 +12,7 @@ import com.doomhamsters.cards.definitions.SnackStashCardDefinition
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 
+/** Resolves card definitions and command metadata for known cards. */
 object CardRegistry {
     val definitions: List<CardDefinition> = listOf(
         DoomCardDefinition,
@@ -26,18 +27,23 @@ object CardRegistry {
         .mapNotNull { definition -> definition.command?.id?.let { it to definition } }
         .toMap()
 
+    /** Returns the most specific definition for a concrete card instance. */
     fun definitionFor(card: Card): CardDefinition {
         val effectDefinition = CardCommandId.fromWire(card.effectId)
             ?.let(definitionsByCommandId::get)
         return effectDefinition ?: definitionForType(card.type)
     }
 
+    /** Returns the registered definition for a card type. */
     fun definitionForType(type: CardType): CardDefinition =
         definitionsByType[type] ?: definitionsByType.getValue(CardType.Normal)
 
+    /** Returns the activatable command definition for a card, if it has one. */
     fun commandFor(card: Card): CardCommandDefinition? = definitionFor(card).command
 }
 
+/** Returns the display name that should be shown for this card. */
 fun Card.displayName(): String = name?.takeIf { it.isNotBlank() } ?: CardRegistry.definitionFor(this).displayName
 
+/** Returns the gameplay description that should be shown for this card. */
 fun Card.cardDescription(): String = CardRegistry.definitionFor(this).description

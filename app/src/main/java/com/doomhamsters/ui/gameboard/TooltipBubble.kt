@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.doomhamsters.ui.theme.*
 
+/** Shows a styled tooltip for the currently selected card. */
 @Composable
 fun TooltipBubble(
     title: String,

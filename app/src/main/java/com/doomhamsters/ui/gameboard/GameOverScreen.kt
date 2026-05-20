@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+/** Displays the winner and a return-to-lobby action after a game ends. */
 @Composable
 fun GameOverScreen(
     winnerId: String,

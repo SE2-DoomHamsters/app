@@ -17,11 +17,13 @@ import com.doomhamsters.ui.theme.DoomHamstersTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 //log is for debug reasons-> can be removed if later its proven to be annoying.
+/** Hosts the Compose-based Doom Hamsters application. */
 class MainActivity : ComponentActivity() {
     private companion object {
         const val TAG = "LobbyDebug"
     }
 
+    /** Initializes the root Compose content for the app. */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "MainActivity.onCreate savedState=${savedInstanceState != null}")
@@ -48,26 +50,31 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** Logs that the activity moved into the started state. */
     override fun onStart() {
         super.onStart()
         Log.d(TAG, "MainActivity.onStart")
     }
 
+    /** Logs that the activity resumed interaction. */
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "MainActivity.onResume")
     }
 
+    /** Logs that the activity is pausing. */
     override fun onPause() {
         Log.d(TAG, "MainActivity.onPause")
         super.onPause()
     }
 
+    /** Logs that the activity stopped. */
     override fun onStop() {
         Log.d(TAG, "MainActivity.onStop")
         super.onStop()
     }
 
+    /** Logs that the activity is being destroyed. */
     override fun onDestroy() {
         Log.d(TAG, "MainActivity.onDestroy")
         super.onDestroy()

@@ -24,6 +24,7 @@ import kotlinx.coroutines.runBlocking
 import java.util.UUID
 import kotlin.random.Random
 
+/** Owns lobby setup, membership, and game-launch state for the frontend flow. */
 class LobbyViewModel(
     private val repository: LobbyRepository = LobbyRepository(BackendConfig.BASE_URL),
     private val userId: String = UUID.randomUUID().toString(),
@@ -67,6 +68,7 @@ class LobbyViewModel(
     val currentUserId: String
         get() = userId
 
+    /** Creates a lobby with the currently entered profile details. */
     fun createGroup() {
         if (username.isBlank() || groupName.isBlank() || isProfileActionInProgress) return
 
@@ -92,6 +94,7 @@ class LobbyViewModel(
         }
     }
 
+    /** Joins the specified lobby with the currently entered profile details. */
     fun joinLobby(scannedLobbyId: String) {
         val normalizedLobbyId = scannedLobbyId.trim()
         if (username.isBlank()) {
@@ -137,6 +140,7 @@ class LobbyViewModel(
         }
     }
 
+    /** Requests game start when the current lobby is ready. */
     fun startGame() {
         val currentLobbyId = _lobby.value?.lobbyId ?: return
         if (isStartingGame) return
@@ -165,6 +169,7 @@ class LobbyViewModel(
         }
     }
 
+    /** Returns the UI to the active lobby after leaving a game. */
     fun returnToLobbyAfterGame() {
         Log.d(
             TAG,
@@ -340,6 +345,7 @@ class LobbyViewModel(
         observedLobbyId = null
     }
 
+    /** Releases lobby observers and network resources when the view model is disposed. */
     override fun onCleared() {
         Log.d(TAG, "LobbyViewModel.onCleared for lobby=$observedLobbyId user=$userId")
         cancelLobbyObservers()
@@ -349,6 +355,7 @@ class LobbyViewModel(
         super.onCleared()
     }
 
+    /** Returns whether the current user may start the game now. */
     fun canCurrentUserStartGame(): Boolean {
         val currentLobby = _lobby.value ?: return false
         if (isStartingGame || currentLobby.gameStarted) return false
@@ -356,6 +363,7 @@ class LobbyViewModel(
         return currentLobby.members.any { it.id == userId }
     }
 
+    /** Explains why the game cannot be started yet, if applicable. */
     fun startAvailabilityMessage(): String? {
         val currentLobby = _lobby.value ?: return null
         if (isStartingGame || currentLobby.gameStarted) {

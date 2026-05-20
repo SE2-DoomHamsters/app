@@ -8,6 +8,7 @@ Delete this note after staging.
 
 import com.doomhamsters.model.CardType
 
+/** Defines the display metadata for regular cards. */
 object NormalCardDefinition : CardDefinition {
     override val type: CardType = CardType.Normal
     override val displayName: String = "Normal"

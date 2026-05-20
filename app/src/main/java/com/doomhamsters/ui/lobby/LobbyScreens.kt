@@ -76,6 +76,7 @@ private data class ProfileSetupUiState(
     val manualLobbyId: String
 )
 
+/** Routes between the lobby flow screens and an active game session. */
 @Composable
 fun MainLobbyNavigation(viewModel: LobbyViewModel) {
     val activeGameSession by viewModel.activeGameSession.collectAsState()
@@ -123,6 +124,7 @@ private fun GameSessionContent(
     }
 }
 
+/** Collects the local player's name, avatar, and lobby action choice. */
 @Composable
 fun ProfileSetupScreen(viewModel: LobbyViewModel) {
     var manualLobbyId by rememberSaveable { mutableStateOf("") }
@@ -312,6 +314,7 @@ private fun LobbyJoinActions(
     }
 }
 
+/** Shows the active lobby membership, QR code, and start controls. */
 @Composable
 fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
     val lobbyState by viewModel.lobby.collectAsState()
@@ -362,6 +365,7 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
     }
 }
 
+/** Creates the game board view model for an active session and shows the board flow. */
 @Composable
 fun GameBoardScreen(
     gameId: String,
@@ -389,6 +393,7 @@ fun GameBoardScreen(
     )
 }
 
+/** Displays the app welcome screen and entry actions. */
 @Composable
 fun StartScreen(
     modifier: Modifier = Modifier,
@@ -459,6 +464,7 @@ fun StartScreen(
     }
 }
 
+/** Displays the game rules screen. */
 @Composable
 fun RulesScreen(modifier: Modifier = Modifier, onBackClick: () -> Unit) {
     Column(
@@ -519,6 +525,7 @@ fun RulesScreen(modifier: Modifier = Modifier, onBackClick: () -> Unit) {
     }
 }
 
+/** Previews the start screen in Android Studio. */
 @Preview(showBackground = true)
 @Composable
 fun StartScreenPreview() {
@@ -527,6 +534,7 @@ fun StartScreenPreview() {
     }
 }
 
+/** Previews the rules screen in Android Studio. */
 @Preview(showBackground = true)
 @Composable
 fun RulesPreview() {

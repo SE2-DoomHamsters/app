@@ -25,6 +25,7 @@ import com.doomhamsters.ui.theme.BackgroundCream
 import com.doomhamsters.ui.theme.CardDarkMaroon
 import com.doomhamsters.ui.theme.OutlineDark
 
+/** Displays a dismissible overlay for a resolved card-command notice. */
 @Composable
 fun CardCommandNoticeOverlay(
     notice: CardCommandNotice,

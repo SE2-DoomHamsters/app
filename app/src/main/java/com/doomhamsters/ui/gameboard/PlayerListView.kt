@@ -8,6 +8,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import com.doomhamsters.model.Player
 
+/** Renders a simple textual list of players for debugging or testing. */
 @Composable
 fun PlayerListView(players: List<Player>, currentPlayerIndex: Int) {
     Column {

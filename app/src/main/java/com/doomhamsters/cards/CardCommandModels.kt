@@ -5,6 +5,7 @@ import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 import org.json.JSONObject
 
+/** Represents the payload sent when a player activates a card command. */
 data class CardCommandRequest(
     val playerId: String,
     val cardId: String?,
@@ -12,6 +13,7 @@ data class CardCommandRequest(
     val commandId: CardCommandId,
     val parameters: JSONObject = JSONObject()
 ) {
+    /** Serializes this command request into the backend JSON format. */
     fun toJson(): JSONObject = JSONObject().apply {
         put("playerId", playerId)
         cardId?.let { put("cardId", it) }
@@ -21,11 +23,13 @@ data class CardCommandRequest(
     }
 }
 
+/** Enumerates the card-command event types emitted by the backend. */
 enum class CardCommandEventType {
     CARD_COMMAND_PLAYED,
     CARD_COMMAND_RESULT
 }
 
+/** Represents a card-command event received from the backend. */
 data class CardCommandEvent(
     val type: CardCommandEventType,
     val commandId: CardCommandId?,
@@ -36,6 +40,7 @@ data class CardCommandEvent(
     val revealedCard: Card?
 ) {
     companion object {
+        /** Parses a backend JSON payload into a card-command event when possible. */
         fun fromJsonOrNull(json: JSONObject): CardCommandEvent? {
             val type = runCatching {
                 CardCommandEventType.valueOf(json.optString("type").trim().uppercase())
@@ -61,6 +66,7 @@ data class CardCommandEvent(
     }
 }
 
+/** Holds the message shown to a player after a card command resolves. */
 data class CardCommandNotice(
     val title: String,
     val message: String,

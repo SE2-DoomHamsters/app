@@ -8,17 +8,22 @@ import com.doomhamsters.logic.cardcommands.CardCommandContext
 import com.doomhamsters.logic.cardcommands.CardCommandOutcome
 import com.doomhamsters.logic.cardcommands.CardCommandSupport
 
+/** Thrown when a player attempts an illegal game action. */
 class InvalidActionException(message: String) : Exception(message)
+/** Thrown when a draw action cannot be completed. */
 class InvalidDrawException(message: String) : Exception(message)
 
+/** Applies frontend-side game rules to an in-memory game state. */
 class GameEngine(playerIds: ArrayList<String>) : CardCommandSupport {
 
     private val gameState: GameState = GameFactory.createGame(playerIds)
 
+    /** Returns a defensive copy of the current game state. */
     fun getState(): GameState = gameState.copy()
 
 
     //Later Restructure it so the logic of what a card does is handled by the cards, strategy pattern.
+    /** Processes a draw and returns a Doom card when it must be reinserted. */
     fun draw(playerId: String): Card? {
         val player = gameState.players.find { it.id == playerId }
             ?: throw InvalidActionException("Player $playerId not found")
@@ -46,10 +51,12 @@ class GameEngine(playerIds: ArrayList<String>) : CardCommandSupport {
         }
     }
 
+    /** Reinserts a card into the deck at the requested position from the top. */
     fun insertCard(card: Card, position: Int) {
         gameState.deck.insertFromTop(card, position)
     }
 
+    /** Activates a card from the player's hand and returns the outcome. */
     fun activateCard(playerId: String, cardId: String): CardCommandOutcome {
         val player = gameState.players.find { it.id == playerId }
             ?: throw InvalidActionException("Player $playerId not found")
@@ -82,6 +89,7 @@ class GameEngine(playerIds: ArrayList<String>) : CardCommandSupport {
         return outcome
     }
 
+    /** Advances play to the next living player or finishes the game. */
     fun advanceTurn() {
         val alivePlayers = gameState.players.filter { it.isAlive() }
         if (alivePlayers.size == 1) {
@@ -96,6 +104,7 @@ class GameEngine(playerIds: ArrayList<String>) : CardCommandSupport {
         gameState.currentPlayerIndex = nextIndex
     }
 
+    /** Removes a card from the player's hand and adds it to the discard pile. */
     override fun discardFromHand(player: Player, card: Card) {
         val removed = player.hand.remove(card)
         if (!removed) {
@@ -104,6 +113,7 @@ class GameEngine(playerIds: ArrayList<String>) : CardCommandSupport {
         gameState.discard.add(card)
     }
 
+    /** Returns the top card of the deck without drawing it. */
     override fun peekTopCard(): Card? = gameState.deck.peekTop()
 
 }

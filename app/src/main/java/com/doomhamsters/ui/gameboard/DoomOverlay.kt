@@ -25,6 +25,7 @@ import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 import com.doomhamsters.model.Player
 
+/** Collects the state needed to render Doom resolution overlays. */
 data class DoomOverlayState(
     val pendingDoom: Card,
     val deckSize: Int,
@@ -34,6 +35,7 @@ data class DoomOverlayState(
     val doomSliderPosition: Float
 )
 
+/** Shows the local Doom outcome and optional Snack Stash selection guidance. */
 @Composable
 fun DoomResolvedOverlay(
     card: Card,
@@ -103,6 +105,7 @@ fun DoomResolvedOverlay(
     }
 }
 
+/** Shows that another player is currently resolving Doom. */
 @Composable
 fun RemoteDoomPauseOverlay(
     playerName: String,
@@ -162,6 +165,7 @@ fun RemoteDoomPauseOverlay(
     }
 }
 
+/** Shows the Doom resolution flow for the local player. */
 @Composable
 fun DoomOverlay(
     state: DoomOverlayState,

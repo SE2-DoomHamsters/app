@@ -9,6 +9,7 @@ import com.doomhamsters.logic.cardcommands.CardCommandContext
 import com.doomhamsters.logic.cardcommands.CardCommandOutcome
 import com.doomhamsters.model.CardType
 
+/** Defines the Quick Peek card and its private peek activation behavior. */
 object QuickPeekCardDefinition : CardDefinition {
     override val type: CardType = CardType.QuickPeek
     override val displayName: String = "Quick Peek"

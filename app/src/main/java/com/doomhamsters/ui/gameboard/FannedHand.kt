@@ -63,6 +63,7 @@ private data class FannedHandState(
     val drawAnimation: DrawAnimationSpec?
 )
 
+/** Configures interaction and layout behavior for a fanned hand. */
 data class FannedHandUiConfig(
     val isOpponent: Boolean,
     val selectedIndex: Int,
@@ -73,17 +74,20 @@ data class FannedHandUiConfig(
     val onCenterMeasured: ((Offset) -> Unit)? = null
 )
 
+/** Provides optional draw animation inputs for a fanned hand. */
 data class FannedHandAnimationConfig(
     val drawAnimation: Pair<Int, Offset>? = null,
     val drawProgress: () -> Float = { 1f }
 )
 
+/** Supplies interaction callbacks used by a fanned hand. */
 data class FannedHandCallbacks(
     val canActivateCard: (Card) -> Boolean = { false },
     val onCardSelected: (Int) -> Unit = {},
     val onCardActivated: (Card) -> Unit = {}
 )
 
+/** Renders a draggable, selectable fanned hand of cards. */
 @Composable
 fun FannedHand(
     cards: List<Card>,

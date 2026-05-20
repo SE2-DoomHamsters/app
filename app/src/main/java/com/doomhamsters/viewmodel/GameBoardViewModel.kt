@@ -27,6 +27,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 
+/** Owns realtime game state, local Doom handling, and card actions for the game board. */
 open class GameBoardViewModel(
     val gameId: String,
     initialLocalPlayerId: String,
@@ -387,6 +388,7 @@ open class GameBoardViewModel(
         applyGameState(snapshot, resolvePlayerId = false)
     }
 
+    /** Disconnects the game repository when the view model is disposed. */
     override fun onCleared() {
         runBlocking {
             repository.disconnect()
@@ -406,6 +408,7 @@ open class GameBoardViewModel(
         Log.d(tag, "UI log: $message")
     }
 
+    /** Attempts to draw a card for the local player. */
     open fun draw(playerId: String) {
         val isResolvingLocalDoom =
             _pendingDoom.value != null ||
@@ -449,6 +452,7 @@ open class GameBoardViewModel(
         }
     }
 
+    /** Reinserts a resolved Doom card at the chosen deck position. */
     open fun insertDoom(position: Int) {
         val state = _gameState.value
         val isResolvingLocalDoom =
@@ -484,18 +488,21 @@ open class GameBoardViewModel(
         }
     }
 
+    /** Reports that Doom defusal is handled automatically by the server. */
     open fun defusePendingDoom(card: Card?) {
         viewModelScope.launch {
             _error.emit("Doom is resolved automatically by the server.")
         }
     }
 
+    /** Reports that Doom acceptance is handled automatically by the server. */
     open fun acceptDoom() {
         viewModelScope.launch {
             _error.emit("Doom is resolved automatically by the server.")
         }
     }
 
+    /** Requests turn advancement when the local player is allowed to do so. */
     open fun advanceTurn() {
         if (!_isLocalPlayersTurn.value) {
             Log.d(
@@ -517,6 +524,7 @@ open class GameBoardViewModel(
         }
     }
 
+    /** Returns whether the local player can activate the supplied card right now. */
     fun canActivateCard(card: Card): Boolean {
         val state = _gameState.value ?: return false
         val localPlayer = state.players.firstOrNull { it.id == localPlayerId } ?: return false
@@ -532,6 +540,7 @@ open class GameBoardViewModel(
             command.actionPath.isNotBlank()
     }
 
+    /** Sends the activation request for a playable card. */
     fun activateCard(card: Card) {
         val command = CardRegistry.commandFor(card) ?: return
         if (!canActivateCard(card)) {
@@ -563,6 +572,7 @@ open class GameBoardViewModel(
         }
     }
 
+    /** Advances the local Doom flow after the player acknowledges the current notice. */
     fun dismissDoomNotice(selectedPlayerCardIndex: Int = -1) {
         if (_pendingDoomRequiresSelection.value) {
             val localPlayer = _gameState.value?.players?.firstOrNull { it.id == localPlayerId }
@@ -595,6 +605,7 @@ open class GameBoardViewModel(
         }
     }
 
+    /** Clears the currently displayed card-command notice. */
     fun dismissCardCommandNotice() {
         _cardCommandNotice.value = null
     }

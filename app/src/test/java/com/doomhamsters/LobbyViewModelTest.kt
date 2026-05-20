@@ -111,6 +111,7 @@ class LobbyViewModelTest {
         viewModel.selectedAvatar = "hamster"
 
         viewModel.createGroup()
+        advanceUntilIdle()
 
         assertEquals(3, viewModel.currentStep)
         assertEquals(fakeLobby, viewModel.lobby.value)
@@ -129,6 +130,7 @@ class LobbyViewModelTest {
         viewModel.selectedAvatar = "hamster"
 
         viewModel.createGroup()
+        advanceUntilIdle()
 
         coVerify {
             mockRepo.createLobby("DoomUnit", User("fixed-id", "Christian", "hamster"))
@@ -143,8 +145,9 @@ class LobbyViewModelTest {
         viewModel.groupName = "DoomUnit"
 
         viewModel.createGroup()
+        advanceUntilIdle()
 
-        assertEquals("No network", viewModel.error.value)
+        assertEquals("Etwas ist schiefgelaufen: No network", viewModel.error.value)
         assertEquals(1, viewModel.currentStep)
     }
 
@@ -213,6 +216,7 @@ class LobbyViewModelTest {
         viewModel.selectedAvatar = "hamster"
 
         viewModel.joinLobby("DOOMUNIT")
+        advanceUntilIdle()
 
         assertEquals(3, viewModel.currentStep)
         assertEquals(fakeLobby, viewModel.lobby.value)
@@ -271,6 +275,7 @@ class LobbyViewModelTest {
         viewModel.username = "Anna"
 
         viewModel.joinLobby("FALSCHE_LOBBY")
+        advanceUntilIdle()
 
         assertEquals("Lobby 'FALSCHE_LOBBY' wurde nicht gefunden!", viewModel.error.value)
         assertEquals(1, viewModel.currentStep)
@@ -284,8 +289,9 @@ class LobbyViewModelTest {
         viewModel.username = "Anna"
 
         viewModel.joinLobby("DOOMUNIT")
+        advanceUntilIdle()
 
-        assertEquals("Fehler beim Beitreten: Server down", viewModel.error.value)
+        assertEquals("Etwas ist schiefgelaufen: Server down", viewModel.error.value)
         assertEquals(1, viewModel.currentStep)
     }
 
@@ -343,7 +349,7 @@ class LobbyViewModelTest {
         viewModel.username = "Christian"
         viewModel.groupName = "DoomUnit"
         viewModel.createGroup()
-        runCurrent()
+        advanceUntilIdle()
 
         viewModel.startGame()
         advanceUntilIdle()

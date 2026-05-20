@@ -179,6 +179,14 @@ class LobbyRepository(
                 JSONObject(jsonString).getString("gameId")
             }
 
+    /**
+     * Meldet einen Spieler von einer Lobby ab
+     * Sendet eine Anfrage an das Backend, um die Verbindung zwischen dem Spieler
+     * und der angegebenen Lobby zu trennen
+     *
+     * @param lobbyId Die ID der Lobby, die verlassen werden soll
+     * @param userId Die ID des Spielers, der die Lobby verlässt
+     */
     suspend fun leaveLobby(lobbyId: String, userId: String) {
         val body = JSONObject().put("userId", userId).toString()
             .toRequestBody("application/json".toMediaType())

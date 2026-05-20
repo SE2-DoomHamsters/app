@@ -92,8 +92,6 @@ class LobbyViewModel(
                 lastCompletedGameId = null
                 isStartingGame = false
 
-                delay(2000) //zum Testen
-
                 Log.d(TAG, "Creating lobby as user=$userId name=$username")
 
                 val user = User(userId, username, selectedAvatar)
@@ -159,6 +157,11 @@ class LobbyViewModel(
         }
     }
 
+    /**
+     * Verlässt die aktuelle Lobby und setzt den Navigationsstatus zurück
+     * Informiert das Backend über den Austritt, bricht alle aktiven Lobby-Observer ab
+     * und navigiert den Nutzer zurück zum Startbildschirm
+     */
     fun leaveLobby() {
         val lobbyId = _lobby.value?.lobbyId
         viewModelScope.launch {

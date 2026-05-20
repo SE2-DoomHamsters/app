@@ -45,9 +45,9 @@ open class GameBoardViewModel(
     private val repository: GameRepository
 ) : ViewModel() {
     private companion object {
-        val initialConnectionRetryDelaysMs = listOf(0L, 10_000L, 30_000L, 60_000L)
+        val initialConnectionRetryDelaysMs = listOf(0L, 5_000L, 10_000L, 15_000L)
         const val maxReconnectAttempts = 3
-        val reconnectBackoffMs = listOf(10_000L, 30_000L, 60_000L)
+        val reconnectBackoffMs = listOf(5_000L, 10_000L, 15_000L)
     }
 
     private val tag = "GameBoardViewModel"
@@ -99,57 +99,6 @@ open class GameBoardViewModel(
         connectAndObserveRemoteState()
     }
 
-    /**
-    private fun connectAndObserveRemoteState() {
-        viewModelScope.launch {
-            val connected = establishInitialConnection()
-            if (!connected) {
-                return@launch
-            }
-
-            try {
-                launch {
-                    repository.subscribeToGameState(gameId)
-                        .catch { e ->
-                            Log.e(tag, "State sync error gameId=$gameId", e)
-                            _error.emit("State sync error: ${e.message}")
-                        }
-                        .collect {
-                            Log.d(
-                                tag,
-                                "WS state received gameId=$gameId currentPlayerId=${it.currentTurnPlayerId} turnCount=${it.turnCount} status=${it.status}"
-                            )
-                            applyGameState(it, resolvePlayerId = false)
-                        }
-                }
-
-                launch {
-                    repository.subscribeToGame(gameId)
-                        .catch { e ->
-                            Log.e(tag, "Public event sync error gameId=$gameId", e)
-                            _error.emit("Event sync error: ${e.message}")
-                        }
-                        .collect { payload ->
-                            runCatching { JSONObject(payload) }
-                                .getOrNull()
-                                ?.let(::handlePublicGameEvent)
-                        }
-                }
-
-                launch {
-                    repository.subscribeToPrivateEvents(gameId, localPlayerId)
-                        .catch { e ->
-                            Log.e(tag, "Private sync error gameId=$gameId playerId=$localPlayerId", e)
-                            _error.emit("Private sync error: ${e.message}")
-                        }
-                        .collect(::handlePrivateEvent)
-                }
-            } catch (e: Exception) {
-                Log.e(tag, "Connection error gameId=$gameId", e)
-                _error.emit("Connection error: ${e.message}")
-            }
-        }
-    }**/
     private fun connectAndObserveRemoteState() {
         viewModelScope.launch {
             val connected = establishInitialConnection()
@@ -174,6 +123,7 @@ open class GameBoardViewModel(
                     refreshGameState( resolvePlayerId = false ) // game state will be restored via REST Call form sessions.json
                     _connectionStatus.value = ConnectionStatus.Connected
                     addLog("Reconnected.")
+                    attempt = 0
                 } catch (e: CancellationException) {
                     throw e // ViewModel is being destroyed
                 } catch (e: Exception) {

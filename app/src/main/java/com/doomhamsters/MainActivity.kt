@@ -31,7 +31,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             DoomHamstersTheme {
                 // 1. Initialisiere ViewModel
-                val lobbyViewModel: LobbyViewModel = viewModel()
+                val lobbyViewModel: LobbyViewModel = viewModel(
+                    factory = LobbyViewModelFactory(applicationContext)
+                )
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     contentWindowInsets = WindowInsets(0, 0, 0, 0)

@@ -27,7 +27,8 @@ fun NavGraph(
                 viewModel = viewModel,
                 playerAvatars = playerAvatars,
                 playerNames = playerNames,
-                onGameOver = { winnerId -> navController.navigate("gameover/$winnerId") }
+                onGameOver = { winnerId -> navController.navigate("gameover/$winnerId") },
+                onLeaveGame = onReturnToLobby
             )
         }
         composable(

@@ -33,6 +33,7 @@ class LobbyViewModelTest {
     private lateinit var mockRepo: LobbyRepository
     private lateinit var viewModel: LobbyViewModel
     private lateinit var gameStartFlow: MutableSharedFlow<String>
+    private lateinit var sessionStore: FakeSessionStore
 
     private val fakeLobby = Lobby(
         lobbyId = "DOOMUNIT",
@@ -53,10 +54,11 @@ class LobbyViewModelTest {
         Dispatchers.setMain(testDispatcher)
         mockRepo = mockk(relaxed = true)
         gameStartFlow = MutableSharedFlow()
+        sessionStore = FakeSessionStore(userId = "fixed-id")
         coEvery { mockRepo.subscribeGameStart(any()) } returns gameStartFlow
         viewModel = LobbyViewModel(
+            sessionStore = sessionStore,
             repository = mockRepo,
-            userId = "fixed-id",
             enableLobbyRefresh = false
         )
     }
@@ -446,5 +448,42 @@ class LobbyViewModelTest {
             .invoke(viewModel)
 
         coVerify { mockRepo.disconnect() }
+    }
+
+    @Test
+    fun `restores saved username on startup`() {
+        val resumedViewModel = LobbyViewModel(
+            sessionStore = FakeSessionStore(
+                userId = "fixed-id",
+                username = "Christian"
+            ),
+            repository = mockRepo,
+            enableLobbyRefresh = false
+        )
+
+        assertEquals(1, resumedViewModel.currentStep)
+        assertNull(resumedViewModel.activeGameSession.value)
+        assertEquals("Christian", resumedViewModel.username)
+
+        LobbyViewModel::class.java.getDeclaredMethod("onCleared")
+            .apply { isAccessible = true }
+            .invoke(resumedViewModel)
+    }
+
+    private class FakeSessionStore(
+        private val userId: String,
+        private var username: String? = null,
+        private var avatar: String? = null
+    ) : SessionStore {
+        override fun getOrCreateUserId(): String = userId
+
+        override fun loadUsername(): String? = username
+
+        override fun loadAvatar(): String? = avatar
+
+        override fun saveProfile(username: String, avatar: String) {
+            this.username = username
+            this.avatar = avatar
+        }
     }
 }

@@ -26,8 +26,8 @@ import kotlin.random.Random
 
 /** Owns lobby setup, membership, and game-launch state for the frontend flow. */
 class LobbyViewModel(
+    private val sessionStore: SessionStore,
     private val repository: LobbyRepository = LobbyRepository(BackendConfig.BASE_URL),
-    private val userId: String = UUID.randomUUID().toString(),
     private val enableLobbyRefresh: Boolean = true
 ) : ViewModel() {
     companion object {
@@ -42,10 +42,26 @@ class LobbyViewModel(
             Random.nextInt(0, 10).toString()
     }
 
+    private val userId: String = sessionStore.getOrCreateUserId()
+
     var currentStep by mutableIntStateOf(1)
     var groupName by mutableStateOf(generateLobbyName())
-    var username by mutableStateOf(generatePlayerName())
-    var selectedAvatar by mutableStateOf("dog")
+    private var usernameState by mutableStateOf(
+        sessionStore.loadUsername() ?: generatePlayerName()
+    )
+    var username: String
+        get() = usernameState
+        set(value) {
+            usernameState = value
+            sessionStore.saveProfile(username = value, avatar = selectedAvatar)
+        }
+    private var selectedAvatarState by mutableStateOf(sessionStore.loadAvatar() ?: "dog")
+    var selectedAvatar: String
+        get() = selectedAvatarState
+        set(value) {
+            selectedAvatarState = value
+            sessionStore.saveProfile(username = username, avatar = value)
+        }
     var isProfileActionInProgress by mutableStateOf(false)
         private set
     var isStartingGame by mutableStateOf(false)
@@ -80,6 +96,7 @@ class LobbyViewModel(
                 lastCompletedGameId = null
                 isStartingGame = false
                 Log.d(TAG, "Creating lobby as user=$userId name=$username")
+                sessionStore.saveProfile(username = username, avatar = selectedAvatar)
 
                 val user = User(userId, username, selectedAvatar)
                 val createdLobby = repository.createLobby(groupName, user)
@@ -115,6 +132,7 @@ class LobbyViewModel(
                 lastCompletedGameId = null
                 isStartingGame = false
                 Log.d(TAG, "Joining lobby=$normalizedLobbyId as user=$userId name=$username")
+                sessionStore.saveProfile(username = username, avatar = selectedAvatar)
 
                 observeLobby(normalizedLobbyId)
                 val user = User(userId, username, selectedAvatar)
@@ -301,11 +319,12 @@ class LobbyViewModel(
         if (_activeGameSession.value?.gameId == startedGameId && currentStep == 4) return
 
         Log.d(TAG, "Opening game session gameId=$startedGameId for user=$userId")
-        _activeGameSession.value = GameSession(
+        val session = GameSession(
             gameId = startedGameId,
             playerId = userId,
             playerName = username
         )
+        _activeGameSession.value = session
         currentStep = 4
         viewModelScope.launch {
             pauseLobbyObservationForActiveGame()

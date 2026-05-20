@@ -45,9 +45,9 @@ open class GameBoardViewModel(
     private val repository: GameRepository
 ) : ViewModel() {
     private companion object {
-        val initialConnectionRetryDelaysMs = listOf(0L, 500L, 1_000L, 2_000L)
+        val initialConnectionRetryDelaysMs = listOf(0L, 10_000L, 30_000L, 60_000L)
         const val maxReconnectAttempts = 3
-        val reconnectBackoffMs = listOf(1_000L, 2_000L, 4_000L)
+        val reconnectBackoffMs = listOf(10_000L, 30_000L, 60_000L)
     }
 
     private val tag = "GameBoardViewModel"
@@ -207,7 +207,12 @@ open class GameBoardViewModel(
                             .collect { event -> runCatching { handlePrivateEvent(event) } }
                     }
                 }
-                return //coroutineScope completed normally (connection closed cleanly)
+                Log.w(
+                    tag,
+                    "Subscriptions completed attempt=$attempt/$maxReconnectAttempts gameId=$gameId"
+                )
+                _connectionStatus.value = ConnectionStatus.Disconnected
+                attempt++
             } catch (e: CancellationException) {
                 throw e // ViewModel destroyed
             } catch (e: Exception) {

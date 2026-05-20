@@ -12,7 +12,7 @@ import io.mockk.Runs
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -40,9 +40,9 @@ class GameBoardViewModelReconnectTest {
         coEvery { repository.connect() } just Runs
         coEvery { repository.disconnect() } just Runs
         coEvery { repository.fetchGameState(any(), any()) } returns defaultGameState()
-        coEvery { repository.subscribeToGameState(any()) } returns emptyFlow()
-        coEvery { repository.subscribeToGame(any()) } returns emptyFlow()
-        coEvery { repository.subscribeToPrivateEvents(any(), any()) } returns emptyFlow()
+        coEvery { repository.subscribeToGameState(any()) } returns activeGameStateFlow()
+        coEvery { repository.subscribeToGame(any()) } returns activeStringFlow()
+        coEvery { repository.subscribeToPrivateEvents(any(), any()) } returns activeJsonFlow()
     }
 
     @AfterEach
@@ -84,13 +84,38 @@ class GameBoardViewModelReconnectTest {
         var subscribeCount = 0
         coEvery { repository.subscribeToGameState(any()) } answers {
             subscribeCount++
-            if (subscribeCount == 1) flow { throw IOException("dropped") } else emptyFlow()
+            if (subscribeCount == 1) flow { throw IOException("dropped") } else activeGameStateFlow()
         }
 
         val vm = createViewModel()
         advanceUntilIdle()
 
         assertEquals(ConnectionStatus.Connected, vm.connectionStatus.value)
+    }
+
+    @Test
+    fun `status returns to Connected after subscriptions complete and reconnect`() = runTest {
+        var gameStateSubscribeCount = 0
+        var publicSubscribeCount = 0
+        var privateSubscribeCount = 0
+        coEvery { repository.subscribeToGameState(any()) } answers {
+            gameStateSubscribeCount++
+            if (gameStateSubscribeCount == 1) flow { } else activeGameStateFlow()
+        }
+        coEvery { repository.subscribeToGame(any()) } answers {
+            publicSubscribeCount++
+            if (publicSubscribeCount == 1) flow { } else activeStringFlow()
+        }
+        coEvery { repository.subscribeToPrivateEvents(any(), any()) } answers {
+            privateSubscribeCount++
+            if (privateSubscribeCount == 1) flow { } else activeJsonFlow()
+        }
+
+        val vm = createViewModel()
+        advanceUntilIdle()
+
+        assertEquals(ConnectionStatus.Connected, vm.connectionStatus.value)
+        coVerify(atLeast = 2) { repository.connect() }
     }
 
     @Test
@@ -148,7 +173,7 @@ class GameBoardViewModelReconnectTest {
         var subscribeCount = 0
         coEvery { repository.subscribeToGameState(any()) } answers {
             subscribeCount++
-            if (subscribeCount == 1) flow { throw IOException("dropped") } else emptyFlow()
+            if (subscribeCount == 1) flow { throw IOException("dropped") } else activeGameStateFlow()
         }
 
         createViewModel()
@@ -162,7 +187,7 @@ class GameBoardViewModelReconnectTest {
         var subscribeCount = 0
         coEvery { repository.subscribeToGameState(any()) } answers {
             subscribeCount++
-            if (subscribeCount == 1) flow { throw IOException("dropped") } else emptyFlow()
+            if (subscribeCount == 1) flow { throw IOException("dropped") } else activeGameStateFlow()
         }
 
         createViewModel()
@@ -176,7 +201,7 @@ class GameBoardViewModelReconnectTest {
         var subscribeCount = 0
         coEvery { repository.subscribeToGameState(any()) } answers {
             subscribeCount++
-            if (subscribeCount == 1) flow { throw IOException("dropped") } else emptyFlow()
+            if (subscribeCount == 1) flow { throw IOException("dropped") } else activeGameStateFlow()
         }
 
         val vm = createViewModel()
@@ -195,6 +220,12 @@ class GameBoardViewModelReconnectTest {
         status = Status.Playing,
         currentPlayerId = "player-1"
     )
+
+    private fun activeGameStateFlow() = flow<GameState> { awaitCancellation() }
+
+    private fun activeStringFlow() = flow<String> { awaitCancellation() }
+
+    private fun activeJsonFlow() = flow<org.json.JSONObject> { awaitCancellation() }
 
     private fun createViewModel() = GameBoardViewModel(
         gameId = "game-1",

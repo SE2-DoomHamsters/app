@@ -113,7 +113,8 @@ fun GameBoard(
     viewModel: GameBoardViewModel,
     playerAvatars: Map<String, String> = emptyMap(),
     playerNames: Map<String, String> = emptyMap(),
-    onGameOver: (String) -> Unit
+    onGameOver: (String) -> Unit,
+    onLeaveGame: () -> Unit = {}
 ) {
     val gameState by viewModel.gameState.collectAsState()
     val isLocalPlayersTurn by viewModel.isLocalPlayersTurn.collectAsState()
@@ -151,7 +152,7 @@ fun GameBoard(
         )
     ) {
         is GameBoardResolution.Status -> {
-            GameBoardStatus(resolution.message)
+            GameBoardStatus(resolution.message, onLeaveGame)
             return
         }
 
@@ -327,9 +328,15 @@ fun GameBoard(
                         .fillMaxWidth()
                         .align(Alignment.TopCenter)
                         .statusBarsPadding()
-                        .zIndex(8f) // above all other UI elements
+                        .zIndex(8f)
                 ) {
                     ConnectionStatusBanner(status = connectionStatus)
+                    androidx.compose.material3.TextButton(
+                        onClick = onLeaveGame,
+                        modifier = Modifier.align(Alignment.TopStart)
+                    ) {
+                        Text("← Leave", fontSize = 12.sp, color = OutlineDark)
+                    }
                 }
 
                 BoardOverlays(
@@ -620,7 +627,7 @@ private fun BoardOverlays(
 }
 
 @Composable
-private fun GameBoardStatus(message: String) {
+private fun GameBoardStatus(message: String, onLeaveGame: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -638,6 +645,9 @@ private fun GameBoardStatus(message: String) {
                 style = MaterialTheme.typography.bodyLarge,
                 color = OutlineDark
             )
+            androidx.compose.material3.OutlinedButton(onClick = onLeaveGame) {
+                Text("New Game")
+            }
         }
     }
 }

@@ -7,7 +7,6 @@ import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
-import okhttp3.OkHttpClient
 import org.hildan.krossbow.stomp.StompClient
 import org.hildan.krossbow.stomp.StompSession
 import org.json.JSONObject
@@ -18,17 +17,15 @@ import org.junit.jupiter.api.assertThrows
 
 class GameRepositoryTest {
 
-    private lateinit var mockHttpClient: OkHttpClient
     private lateinit var mockStompClient: StompClient
     private lateinit var mockSession: StompSession
     private lateinit var repository: GameRepository
 
     @BeforeEach
     fun setUp() {
-        mockHttpClient = mockk(relaxed = true)
         mockStompClient = mockk()
         mockSession = mockk(relaxed = true)
-        repository = GameRepository("localhost:8080", mockHttpClient, mockStompClient)
+        repository = GameRepository("localhost:8080", stompClient = mockStompClient)
     }
 
     @Test

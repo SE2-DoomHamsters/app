@@ -57,6 +57,9 @@ class LobbyViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    private val _infoMessage = MutableStateFlow<String?>(null)
+    val infoMessage: StateFlow<String?> = _infoMessage
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
@@ -199,7 +202,7 @@ class LobbyViewModel(
                 }
                 if (refreshedLobby?.gameStarted != true && refreshedLobby?.gameId.isNullOrBlank()) {
                     isStartingGame = false
-                    _isLoading.value = true
+                    _isLoading.value = false
                     _error.value = mapThrowableToMessage(e)
                 }
             }
@@ -273,7 +276,7 @@ class LobbyViewModel(
             repository.subscribeLobbyUpdates(lobbyId)
                 .catch { error ->
                     Log.d(TAG, "Lobby updates failed for $lobbyId: ${error.message}")
-                    _error.value = "Lobby-Updates abgebrochen: ${error.message}"
+                    _infoMessage.value = "Verbindung wird im Hintergrund aktualisiert..."
                     observedLobbyId = null
                 }
                 .collect(::applyLobbySnapshot)
@@ -291,7 +294,7 @@ class LobbyViewModel(
             repository.subscribeGameStart(lobbyId)
                 .catch { error ->
                     Log.d(TAG, "Game start listener failed for $lobbyId: ${error.message}")
-                    _error.value = "Spielstart-Listener abgebrochen: ${error.message}"
+                    _infoMessage.value = "Spielstart-Synchronisierung eingeschränkt."
                     observedLobbyId = null
                 }
                 .collect { newGameId ->
@@ -426,6 +429,11 @@ class LobbyViewModel(
     /** Clears the current error message. */
     fun clearError() {
         _error.value = null
+    }
+
+    /** Clears the current info message. */
+    fun clearInfoMessage() {
+        _infoMessage.value = null
     }
 
     /** Retries the last failed action. */

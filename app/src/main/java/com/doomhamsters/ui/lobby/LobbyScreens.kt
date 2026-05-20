@@ -1,6 +1,11 @@
 package com.doomhamsters.ui.lobby
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,7 +24,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,17 +35,23 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -87,6 +97,8 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
     val lobbyState by viewModel.lobby.collectAsState()
     val errorState by viewModel.error.collectAsState()
     val isLoadingState by viewModel.isLoading.collectAsState()
+    val infoMessage by viewModel.infoMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     val playerAvatars = lobbyState?.members
         ?.flatMap { member -> listOf(member.id to member.avatar, member.username to member.avatar) }
@@ -107,18 +119,34 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
         )
     }
 
+    LaunchedEffect(infoMessage) {
+        infoMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearInfoMessage()
+        }
+    }
 
-    when (viewModel.currentStep) {
-        1 -> StartScreen(viewModel = viewModel)
-        2 -> ProfileSetupScreen(viewModel)
-        3 -> ActiveLobbyScreen(viewModel)
-        4 -> GameSessionContent(
-            session = activeGameSession,
-            playerAvatars = playerAvatars,
-            playerNames = playerNames,
-            onReturnToLobby = viewModel::returnToLobbyAfterGame
-        )
-        5 -> RulesScreen(onBackClick = { viewModel.currentStep = 1 })
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)) {
+            when (viewModel.currentStep) {
+                1 -> StartScreen(viewModel = viewModel)
+                2 -> ProfileSetupScreen(viewModel)
+                3 -> ActiveLobbyScreen(viewModel)
+                4 -> GameSessionContent(
+                    session = activeGameSession,
+                    playerAvatars = playerAvatars,
+                    playerNames = playerNames,
+                    onReturnToLobby = viewModel::returnToLobbyAfterGame
+                )
+
+                5 -> RulesScreen(onBackClick = { viewModel.currentStep = 1 })
+            }
+        }
     }
 }
 
@@ -355,17 +383,10 @@ private fun LobbyJoinActions(
             .height(56.dp),
         enabled = uiState.canJoinManualLobby
     ) {
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(24.dp),
-                color = MaterialTheme.colorScheme.primary,
-                strokeWidth = 2.dp
-            )
-        } else {
-            Text("Mit Lobby ID beitreten")
-        }
+        Text(if (uiState.isProfileActionInProgress) "Bitte warten..." else "Mit Lobby ID beitreten")
     }
 }
+
 
 /** Shows the active lobby membership, QR code, and start controls. */
 @Composable
@@ -381,24 +402,6 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
             .padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(if (isConnected) Color.Green else Color.Red, CircleShape)
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = if (isConnected) "Verbunden" else "Verbindung wird hergestellt...",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (isConnected) Color.Unspecified else Color.Red
-            )
-        }
-        Spacer(Modifier.height(16.dp))
         Text("Lobby ID: ${lobbyState?.lobbyId}", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(24.dp))
 
@@ -410,13 +413,41 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
                     modifier = Modifier.size(200.dp)
                 )
             }
+        } ?: Box(
+            modifier = Modifier
+                .size(200.dp)
+                .background(Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("QR-Code wird geladen...", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
         }
 
         Spacer(Modifier.height(24.dp))
-        Text("Spieler in der Lobby: ${lobbyState?.members?.size ?: 0}")
+        val members = lobbyState?.members.orEmpty()
+        Text("Spieler in der Lobby: ${members.size}")
 
-        lobbyState?.members?.forEach { member ->
-            Text("${member.avatar} ${member.username}")
+        if (members.size < 2) {
+            val infiniteTransition = rememberInfiniteTransition(label = "waiting")
+            val alpha by infiniteTransition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "alpha"
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Warte auf Spieler...",
+                modifier = Modifier.alpha(alpha),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
+            )
+        } else {
+            members.forEach { member ->
+                Text("${member.avatar} ${member.username}")
+            }
         }
 
         Spacer(modifier = Modifier.weight(1f))

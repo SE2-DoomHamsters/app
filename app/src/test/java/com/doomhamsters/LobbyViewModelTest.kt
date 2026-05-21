@@ -583,6 +583,8 @@ class LobbyViewModelTest {
         advanceUntilIdle()
         assertEquals(false, viewModel.isLoading.value)
         job.join()
+    }
+
     private class FakeSessionStore(
         private val userId: String,
         private var username: String? = null,

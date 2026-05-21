@@ -78,14 +78,24 @@ class LobbyViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    private val _infoMessage = MutableStateFlow<String?>(null)
+    val infoMessage: StateFlow<String?> = _infoMessage
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
     private val _activeGameSession = MutableStateFlow<GameSession?>(null)
     val activeGameSession: StateFlow<GameSession?> = _activeGameSession
+
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected: StateFlow<Boolean> = _isConnected
 
     private var observedLobbyId: String? = null
     private var lobbyUpdatesJob: Job? = null
     private var gameStartJob: Job? = null
     private var lobbyRefreshJob: Job? = null
     private var lastCompletedGameId: String? = null
+    private var lastAttemptedAction: (() -> Unit)? = null
     val currentUserId: String
         get() = userId
 
@@ -129,14 +139,17 @@ class LobbyViewModel(
     /** Creates a lobby with the currently entered profile details. */
     fun createGroup() {
         if (username.isBlank() || groupName.isBlank() || isProfileActionInProgress) return
+        lastAttemptedAction = { createGroup() }
 
         viewModelScope.launch {
             try {
                 isProfileActionInProgress = true
+                _isLoading.value = true
                 _error.value = null
                 _activeGameSession.value = null
                 lastCompletedGameId = null
                 isStartingGame = false
+
                 Log.d(TAG, "Creating lobby as user=$userId name=$username")
                 sessionStore.saveProfile(username = username, avatar = selectedAvatar)
 
@@ -146,9 +159,10 @@ class LobbyViewModel(
                 applyLobbySnapshot(createdLobby)
                 observeLobby(createdLobby.lobbyId)
             } catch (e: Exception) {
-                _error.value = e.message
+                _error.value = mapThrowableToMessage(e)
             } finally {
                 isProfileActionInProgress = false
+                _isLoading.value = false
             }
         }
     }
@@ -156,6 +170,7 @@ class LobbyViewModel(
     /** Joins the specified lobby with the currently entered profile details. */
     fun joinLobby(scannedLobbyId: String) {
         val normalizedLobbyId = scannedLobbyId.trim()
+        lastAttemptedAction = { joinLobby(normalizedLobbyId) }
         if (username.isBlank()) {
             _error.value = "Bitte gib zuerst deinen Spielernamen ein!"
             return
@@ -169,6 +184,7 @@ class LobbyViewModel(
         viewModelScope.launch {
             try {
                 isProfileActionInProgress = true
+                _isLoading.value = true
                 _error.value = null
                 _activeGameSession.value = null
                 lastCompletedGameId = null
@@ -193,13 +209,19 @@ class LobbyViewModel(
                 observeLobby(joinedLobby.lobbyId)
             } catch (e: Exception) {
                 clearObservedLobby()
-                _error.value = "Fehler beim Beitreten: ${e.message}"
+                _error.value = mapThrowableToMessage(e)
             } finally {
                 isProfileActionInProgress = false
+                _isLoading.value = false
             }
         }
     }
 
+    /**
+     * Verlässt die aktuelle Lobby und setzt den Navigationsstatus zurück
+     * Informiert das Backend über den Austritt, bricht alle aktiven Lobby-Observer ab
+     * und navigiert den Nutzer zurück zum Startbildschirm
+     */
     fun leaveLobby() {
         val lobbyId = _lobby.value?.lobbyId
         viewModelScope.launch {
@@ -221,6 +243,7 @@ class LobbyViewModel(
     /** Requests game start when the current lobby is ready. */
     fun startGame() {
         val currentLobbyId = _lobby.value?.lobbyId ?: return
+        lastAttemptedAction = { startGame() }
         if (isStartingGame) return
         if (!canCurrentUserStartGame()) {
             _error.value = startAvailabilityMessage()
@@ -230,6 +253,7 @@ class LobbyViewModel(
         viewModelScope.launch {
             try {
                 isStartingGame = true
+                _isLoading.value = true
                 _error.value = null
                 Log.d(TAG, "Starting game for lobby=$currentLobbyId")
                 repository.triggerGameStart(currentLobbyId, userId)
@@ -241,7 +265,8 @@ class LobbyViewModel(
                 }
                 if (refreshedLobby?.gameStarted != true && refreshedLobby?.gameId.isNullOrBlank()) {
                     isStartingGame = false
-                    _error.value = "Konnte Spiel nicht starten: ${e.message}"
+                    _isLoading.value = false
+                    _error.value = mapThrowableToMessage(e)
                 }
             }
         }
@@ -289,10 +314,15 @@ class LobbyViewModel(
     }
 
     private suspend fun ensureRealtimeLobbyObservers(lobbyId: String) {
-        if (lobbyUpdatesJob?.isActive == true && gameStartJob?.isActive == true) return
+        if (lobbyUpdatesJob?.isActive == true && gameStartJob?.isActive == true) {
+            _isConnected.value = repository.isConnected()
+            return
+        }
         if (!repository.isConnected()) {
             try {
+                _isConnected.value = false
                 repository.connect()
+                _isConnected.value = true
             } catch (error: Exception) {
                 Log.d(TAG, "Realtime lobby connection unavailable for $lobbyId: ${error.message}")
                 return
@@ -304,17 +334,24 @@ class LobbyViewModel(
         if (gameStartJob?.isActive != true) {
             launchGameStartListener(lobbyId)
         }
+        _isConnected.value = repository.isConnected()
     }
 
     private fun launchLobbyUpdates(lobbyId: String) {
         lobbyUpdatesJob = viewModelScope.launch {
-            repository.subscribeLobbyUpdates(lobbyId)
-                .catch { error ->
-                    Log.d(TAG, "Lobby updates failed for $lobbyId: ${error.message}")
-                    _error.value = "Lobby-Updates abgebrochen: ${error.message}"
-                    observedLobbyId = null
-                }
-                .collect(::applyLobbySnapshot)
+            try {
+                repository.subscribeLobbyUpdates(lobbyId)
+                    .catch { error ->
+                        Log.d(TAG, "Lobby updates failed for $lobbyId: ${error.message}")
+                        _infoMessage.value = "Verbindung wird im Hintergrund aktualisiert..."
+                        observedLobbyId = null
+                    }
+                    .collect(::applyLobbySnapshot)
+            } catch (e: Exception) {
+                Log.d(TAG, "Lobby updates setup failed for $lobbyId: ${e.message}")
+                _infoMessage.value = "Verbindung wird im Hintergrund aktualisiert..."
+                observedLobbyId = null
+            }
         }
         lobbyUpdatesJob?.invokeOnCompletion { error ->
             Log.d(
@@ -329,7 +366,7 @@ class LobbyViewModel(
             repository.subscribeGameStart(lobbyId)
                 .catch { error ->
                     Log.d(TAG, "Game start listener failed for $lobbyId: ${error.message}")
-                    _error.value = "Spielstart-Listener abgebrochen: ${error.message}"
+                    _infoMessage.value = "Spielstart-Synchronisierung eingeschränkt."
                     observedLobbyId = null
                 }
                 .collect { newGameId ->
@@ -421,11 +458,13 @@ class LobbyViewModel(
         Log.d(TAG, "Pausing lobby observers for active game lobby=$observedLobbyId")
         stopLobbyObservers()
         repository.disconnect()
+        _isConnected.value = false
     }
 
     private suspend fun clearObservedLobby() {
         stopLobbyObservers()
         observedLobbyId = null
+        _isConnected.value = false
     }
 
     /** Releases lobby observers and network resources when the view model is disposed. */
@@ -459,5 +498,33 @@ class LobbyViewModel(
             return "Warte auf die Lobby-Synchronisierung."
         }
         return null
+    }
+
+    /** Clears the current error message. */
+    fun clearError() {
+        _error.value = null
+    }
+
+    /** Clears the current info message. */
+    fun clearInfoMessage() {
+        _infoMessage.value = null
+    }
+
+    /** Retries the last failed action. */
+    fun retryLastAction() {
+        val action = lastAttemptedAction
+        clearError()
+        action?.invoke()
+    }
+
+    private fun mapThrowableToMessage(e: Throwable): String {
+        val msg = e.message ?: ""
+        return when {
+            msg.contains("timeout", ignoreCase = true) -> "Die Verbindung zum Server hat zu lange gedauert. Bitte versuche es erneut."
+            msg.contains("Failed to connect", ignoreCase = true) -> "Der Server ist aktuell nicht erreichbar. Prüfe deine Internetverbindung oder die Server-Adresse."
+            msg.contains("Lobby", ignoreCase = true) && msg.contains("not found", ignoreCase = true) -> "Die eingegebene Lobby-ID existiert nicht."
+            msg.contains("full", ignoreCase = true) -> "Diese Lobby ist leider schon voll."
+            else -> "Etwas ist schiefgelaufen: ${e.localizedMessage ?: "Unbekannter Fehler"}"
+        }
     }
 }

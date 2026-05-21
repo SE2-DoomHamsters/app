@@ -1,6 +1,11 @@
 package com.doomhamsters.ui.lobby
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -10,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -22,25 +28,34 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -81,6 +96,11 @@ private data class ProfileSetupUiState(
 fun MainLobbyNavigation(viewModel: LobbyViewModel) {
     val activeGameSession by viewModel.activeGameSession.collectAsState()
     val lobbyState by viewModel.lobby.collectAsState()
+    val errorState by viewModel.error.collectAsState()
+    val isLoadingState by viewModel.isLoading.collectAsState()
+    val infoMessage by viewModel.infoMessage.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
     val playerAvatars = lobbyState?.members
         ?.flatMap { member -> listOf(member.id to member.avatar, member.username to member.avatar) }
         ?.toMap()
@@ -89,17 +109,45 @@ fun MainLobbyNavigation(viewModel: LobbyViewModel) {
         ?.associate { member -> member.id to member.username }
         .orEmpty()
 
-    when (viewModel.currentStep) {
-        1 -> StartScreen(viewModel = viewModel)
-        2 -> ProfileSetupScreen(viewModel)
-        3 -> ActiveLobbyScreen(viewModel)
-        4 -> GameSessionContent(
-            session = activeGameSession,
-            playerAvatars = playerAvatars,
-            playerNames = playerNames,
-            onReturnToLobby = viewModel::returnToLobbyAfterGame
+    // Global Error Dialog
+    errorState?.let { message ->
+        ErrorDialog(
+            message = message,
+            onDismiss = { viewModel.clearError() },
+            onRetry = {
+                viewModel.retryLastAction()
+            }
         )
-        5 -> RulesScreen(onBackClick = { viewModel.currentStep = 1 })
+    }
+
+    LaunchedEffect(infoMessage) {
+        infoMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearInfoMessage()
+        }
+    }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)) {
+            when (viewModel.currentStep) {
+                1 -> StartScreen(viewModel = viewModel)
+                2 -> ProfileSetupScreen(viewModel)
+                3 -> ActiveLobbyScreen(viewModel)
+                4 -> GameSessionContent(
+                    session = activeGameSession,
+                    playerAvatars = playerAvatars,
+                    playerNames = playerNames,
+                    onReturnToLobby = viewModel::returnToLobbyAfterGame
+                )
+
+                5 -> RulesScreen(onBackClick = { viewModel.currentStep = 1 })
+            }
+        }
     }
 }
 
@@ -135,6 +183,7 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
         }
     )
     val errorState by viewModel.error.collectAsState()
+    val isLoadingState by viewModel.isLoading.collectAsState()
     val uiState = ProfileSetupUiState(
         isProfileActionInProgress = viewModel.isProfileActionInProgress,
         canCreateGroup = viewModel.username.isNotBlank() &&
@@ -180,6 +229,7 @@ fun ProfileSetupScreen(viewModel: LobbyViewModel) {
 
         LobbyJoinActions(
             uiState = uiState,
+            isLoading = isLoadingState,
             onManualLobbyIdChange = { manualLobbyId = it },
             onCreateGroup = viewModel::createGroup,
             onScanLobby = {
@@ -202,12 +252,21 @@ private fun ProfileDetailsFields(
     groupName: String,
     onGroupNameChange: (String) -> Unit
 ) {
+    val isUsernameError = username.isEmpty()
+    val isGroupNameError = groupName.isEmpty()
+
     OutlinedTextField(
         value = username,
         onValueChange = onUsernameChange,
         label = { Text("Dein Spielername") },
         modifier = Modifier.fillMaxWidth(),
-        singleLine = true
+        singleLine = true,
+        isError = isUsernameError,
+        supportingText = {
+            if (isUsernameError) {
+                Text("Feld darf nicht leer sein", color = MaterialTheme.colorScheme.error)
+            }
+        }
     )
 
     Spacer(Modifier.height(16.dp))
@@ -217,7 +276,16 @@ private fun ProfileDetailsFields(
         onValueChange = onGroupNameChange,
         label = { Text("Name der Gruppe / Lobby") },
         modifier = Modifier.fillMaxWidth(),
-        singleLine = true
+        singleLine = true,
+        isError = isGroupNameError,
+        supportingText = {
+            if (isGroupNameError) {
+                Text(
+                    "Feld darf nicht leer sein",
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
     )
 }
 
@@ -259,6 +327,7 @@ private fun AvatarPicker(
 @Composable
 private fun LobbyJoinActions(
     uiState: ProfileSetupUiState,
+    isLoading: Boolean,
     onManualLobbyIdChange: (String) -> Unit,
     onCreateGroup: () -> Unit,
     onScanLobby: () -> Unit,
@@ -271,15 +340,20 @@ private fun LobbyJoinActions(
             .height(56.dp),
         enabled = uiState.canCreateGroup
     ) {
-        Text(if (uiState.isProfileActionInProgress) "Bitte warten..." else "Gruppe erstellen")
+        if (isLoading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(24.dp),
+                color = MaterialTheme.colorScheme.onPrimary,
+                strokeWidth = 2.dp
+            )
+        } else {
+            Text("Gruppe erstellen")
+        }
     }
     Spacer(Modifier.height(16.dp))
     Text("ODER")
     Spacer(Modifier.height(16.dp))
 
-    uiState.errorMessage?.let { message ->
-        Text(text = message, color = Color.Red)
-    }
     OutlinedButton(
         onClick = onScanLobby,
         modifier = Modifier
@@ -314,10 +388,12 @@ private fun LobbyJoinActions(
     }
 }
 
+
 /** Shows the active lobby membership, QR code, and start controls. */
 @Composable
 fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
     val lobbyState by viewModel.lobby.collectAsState()
+    val isConnected by viewModel.isConnected.collectAsState()
     val startAvailabilityMessage = viewModel.startAvailabilityMessage()
     val canStartGame = viewModel.canCurrentUserStartGame()
 
@@ -338,13 +414,41 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
                     modifier = Modifier.size(200.dp)
                 )
             }
+        } ?: Box(
+            modifier = Modifier
+                .size(200.dp)
+                .background(Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(8.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("QR-Code wird geladen...", textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
         }
 
         Spacer(Modifier.height(24.dp))
-        Text("Spieler in der Lobby: ${lobbyState?.members?.size ?: 0}")
+        val members = lobbyState?.members.orEmpty()
+        Text("Spieler in der Lobby: ${members.size}")
 
-        lobbyState?.members?.forEach { member ->
-            Text("${member.avatar} ${member.username}")
+        if (members.size < 2) {
+            val infiniteTransition = rememberInfiniteTransition(label = "waiting")
+            val alpha by infiniteTransition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "alpha"
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Warte auf Spieler...",
+                modifier = Modifier.alpha(alpha),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color.Gray
+            )
+        } else {
+            members.forEach { member ->
+                Text("${member.avatar} ${member.username}")
+            }
         }
 
         Spacer(modifier = Modifier.weight(1f))
@@ -360,7 +464,15 @@ fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
             modifier = Modifier.fillMaxWidth(),
             enabled = canStartGame
         ) {
-            Text(if (viewModel.isStartingGame) "STARTE SPIEL..." else "Spiel fur alle starten")
+            if (viewModel.isStartingGame) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text("Spiel für alle starten")
+            }
         }
 
         Spacer (Modifier.height(8.dp))
@@ -532,6 +644,29 @@ fun RulesScreen(modifier: Modifier = Modifier, onBackClick: () -> Unit) {
             )
         }
     }
+}
+
+@Composable
+private fun ErrorDialog(message: String, onDismiss: () -> Unit, onRetry: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Oops!", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        text = { Text(message) },
+        confirmButton = {
+            Button(onClick = onDismiss) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onRetry) {
+                Text("Nochmal versuchen")
+            }
+        }
+    )
 }
 
 /** Previews the start screen in Android Studio. */

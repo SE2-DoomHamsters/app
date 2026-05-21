@@ -10,8 +10,10 @@ import io.mockk.just
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -111,6 +113,7 @@ class LobbyViewModelTest {
         viewModel.selectedAvatar = "hamster"
 
         viewModel.createGroup()
+        advanceUntilIdle()
 
         assertEquals(3, viewModel.currentStep)
         assertEquals(fakeLobby, viewModel.lobby.value)
@@ -129,6 +132,7 @@ class LobbyViewModelTest {
         viewModel.selectedAvatar = "hamster"
 
         viewModel.createGroup()
+        advanceUntilIdle()
 
         coVerify {
             mockRepo.createLobby("DoomUnit", User("fixed-id", "Christian", "hamster"))
@@ -143,8 +147,9 @@ class LobbyViewModelTest {
         viewModel.groupName = "DoomUnit"
 
         viewModel.createGroup()
+        advanceUntilIdle()
 
-        assertEquals("No network", viewModel.error.value)
+        assertEquals("Etwas ist schiefgelaufen: No network", viewModel.error.value)
         assertEquals(1, viewModel.currentStep)
     }
 
@@ -213,6 +218,7 @@ class LobbyViewModelTest {
         viewModel.selectedAvatar = "hamster"
 
         viewModel.joinLobby("DOOMUNIT")
+        advanceUntilIdle()
 
         assertEquals(3, viewModel.currentStep)
         assertEquals(fakeLobby, viewModel.lobby.value)
@@ -271,6 +277,7 @@ class LobbyViewModelTest {
         viewModel.username = "Anna"
 
         viewModel.joinLobby("FALSCHE_LOBBY")
+        advanceUntilIdle()
 
         assertEquals("Lobby 'FALSCHE_LOBBY' wurde nicht gefunden!", viewModel.error.value)
         assertEquals(1, viewModel.currentStep)
@@ -284,8 +291,9 @@ class LobbyViewModelTest {
         viewModel.username = "Anna"
 
         viewModel.joinLobby("DOOMUNIT")
+        advanceUntilIdle()
 
-        assertEquals("Fehler beim Beitreten: Server down", viewModel.error.value)
+        assertEquals("Etwas ist schiefgelaufen: Server down", viewModel.error.value)
         assertEquals(1, viewModel.currentStep)
     }
 
@@ -343,7 +351,7 @@ class LobbyViewModelTest {
         viewModel.username = "Christian"
         viewModel.groupName = "DoomUnit"
         viewModel.createGroup()
-        runCurrent()
+        advanceUntilIdle()
 
         viewModel.startGame()
         advanceUntilIdle()
@@ -505,6 +513,76 @@ class LobbyViewModelTest {
 
         assertEquals(1, viewModel.currentStep)
         assertNull(viewModel.lobby.value)
+    }
+
+    @Test
+    fun `retryLastAction retries the failed createGroup action`() = runTest {
+        coEvery { mockRepo.createLobby(any(), any()) } throws RuntimeException("First attempt failed") andThen fakeLobby
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+
+        viewModel.username = "Michelle"
+        viewModel.groupName = "DoomUnit"
+
+        // First attempt
+        viewModel.createGroup()
+        advanceUntilIdle()
+        assertEquals("Etwas ist schiefgelaufen: First attempt failed", viewModel.error.value)
+
+        // Retry
+        viewModel.retryLastAction()
+        advanceUntilIdle()
+
+        assertNull(viewModel.error.value)
+        assertEquals(3, viewModel.currentStep)
+        assertEquals(fakeLobby, viewModel.lobby.value)
+    }
+
+    @Test
+    fun `clearError resets error flow`() {
+        viewModel.joinLobby("") // Triggers error
+        assertEquals("Bitte gib eine gultige Lobby-ID ein!", viewModel.error.value)
+
+        viewModel.clearError()
+        assertNull(viewModel.error.value)
+    }
+
+    @Test
+    fun `clearInfoMessage resets infoMessage flow`() = runTest {
+        val lobbyFlow = MutableSharedFlow<Lobby>()
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns fakeLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } throws RuntimeException("Update failed")
+
+        viewModel.username = "Michelle"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+
+        assertEquals("Verbindung wird im Hintergrund aktualisiert...", viewModel.infoMessage.value)
+
+        viewModel.clearInfoMessage()
+        assertNull(viewModel.infoMessage.value)
+    }
+
+    @Test
+    fun `isLoading is true during createGroup and false after`() = runTest {
+        coEvery { mockRepo.createLobby(any(), any()) } coAnswers {
+            delay(1000)
+            fakeLobby
+        }
+        coEvery { mockRepo.connect() } just Runs
+
+        viewModel.username = "Michelle"
+        viewModel.groupName = "DoomUnit"
+
+        val job = launch { viewModel.createGroup() }
+        runCurrent()
+        assertEquals(true, viewModel.isLoading.value)
+
+        advanceUntilIdle()
+        assertEquals(false, viewModel.isLoading.value)
+        job.join()
     }
 
     private class FakeSessionStore(

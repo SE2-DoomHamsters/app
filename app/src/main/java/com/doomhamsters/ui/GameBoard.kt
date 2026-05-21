@@ -25,6 +25,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import com.doomhamsters.viewmodel.ConnectionStatus
 import com.doomhamsters.cards.CardCommandNotice
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.GameState
@@ -109,7 +113,8 @@ fun GameBoard(
     viewModel: GameBoardViewModel,
     playerAvatars: Map<String, String> = emptyMap(),
     playerNames: Map<String, String> = emptyMap(),
-    onGameOver: (String) -> Unit
+    onGameOver: (String) -> Unit,
+    onLeaveGame: () -> Unit = {}
 ) {
     val gameState by viewModel.gameState.collectAsState()
     val isLocalPlayersTurn by viewModel.isLocalPlayersTurn.collectAsState()
@@ -122,6 +127,7 @@ fun GameBoard(
     val pausedForDoomDetail by viewModel.pausedForDoomDetail.collectAsState()
     val cardCommandNotice by viewModel.cardCommandNotice.collectAsState()
     var latestError by remember { mutableStateOf<String?>(null) }
+    val connectionStatus by viewModel.connectionStatus.collectAsState()
 
     var selectedPlayerCardIndex by remember { mutableIntStateOf(-1) }
     var doomSliderPosition by remember { mutableFloatStateOf(0f) }
@@ -146,7 +152,7 @@ fun GameBoard(
         )
     ) {
         is GameBoardResolution.Status -> {
-            GameBoardStatus(resolution.message)
+            GameBoardStatus(resolution.message, onLeaveGame)
             return
         }
 
@@ -316,6 +322,22 @@ fun GameBoard(
                         .zIndex(4f)
                         .align(Alignment.TopCenter)
                 )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .zIndex(8f)
+                ) {
+                    ConnectionStatusBanner(status = connectionStatus)
+                    androidx.compose.material3.TextButton(
+                        onClick = onLeaveGame,
+                        modifier = Modifier.align(Alignment.TopStart)
+                    ) {
+                        Text("← Leave", fontSize = 12.sp, color = OutlineDark)
+                    }
+                }
 
                 BoardOverlays(
                     overlayState = overlayState,
@@ -605,7 +627,7 @@ private fun BoardOverlays(
 }
 
 @Composable
-private fun GameBoardStatus(message: String) {
+private fun GameBoardStatus(message: String, onLeaveGame: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -623,6 +645,9 @@ private fun GameBoardStatus(message: String) {
                 style = MaterialTheme.typography.bodyLarge,
                 color = OutlineDark
             )
+            androidx.compose.material3.OutlinedButton(onClick = onLeaveGame) {
+                Text("New Game")
+            }
         }
     }
 }
@@ -806,5 +831,46 @@ private fun PlayerArea(
             lives = content.player.lives,
             modifier = Modifier.padding(bottom = 8.dp).zIndex(200f)
         )
+    }
+}
+
+@Composable
+private fun ConnectionStatusBanner(status: ConnectionStatus) {
+    AnimatedVisibility(
+        visible = status != ConnectionStatus.Connected,
+        enter = slideInVertically(initialOffsetY = { -it}),
+        exit = slideOutVertically(targetOffsetY = { -it })
+    ) {
+        val background = if (status is ConnectionStatus.Failed) DoomColor else AccentOrange
+        val text = when (status) {
+            is ConnectionStatus.Reconnecting ->
+                "Reconnection\u2026 (${status.attempt}/${status.maxAttempts})"
+            ConnectionStatus.Disconnected -> "Connection lost\u2026"
+            ConnectionStatus.Failed -> "Connection failed. The hamster has died. RIP. Please restart."
+            ConnectionStatus.Connected -> ""
+        }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(background)
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (status is ConnectionStatus.Reconnecting) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    color = SoftWhite,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+            Text(
+                text = text,
+                color = SoftWhite,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
     }
 }

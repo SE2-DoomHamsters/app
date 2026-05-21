@@ -11,7 +11,8 @@ import io.mockk.just
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -34,9 +35,9 @@ class GameBoardViewModelTest {
         Dispatchers.setMain(testDispatcher)
         repository = mockk(relaxed = true)
         coEvery { repository.connect() } just Runs
-        coEvery { repository.subscribeToGame("game-1") } returns emptyFlow()
-        coEvery { repository.subscribeToGameState("game-1") } returns emptyFlow()
-        coEvery { repository.subscribeToPrivateEvents("game-1", any()) } returns emptyFlow()
+        coEvery { repository.subscribeToGame("game-1") } returns activeStringFlow()
+        coEvery { repository.subscribeToGameState("game-1") } returns activeGameStateFlow()
+        coEvery { repository.subscribeToPrivateEvents("game-1", any()) } returns activeJsonFlow()
     }
 
     @AfterEach
@@ -55,7 +56,7 @@ class GameBoardViewModelTest {
             )
         )
         coEvery { repository.fetchGameState("game-1", "player-1") } returns state
-        coEvery { repository.subscribeToPrivateEvents("game-1", "player-1") } returns emptyFlow()
+        coEvery { repository.subscribeToPrivateEvents("game-1", "player-1") } returns activeJsonFlow()
 
         val viewModel = createViewModel(
             gameId = "game-1",
@@ -78,7 +79,7 @@ class GameBoardViewModelTest {
         )
         coEvery { repository.fetchGameState("game-1", "client-temp") } returns state
         coEvery { repository.fetchGameState("game-1", "server-42") } returns state
-        coEvery { repository.subscribeToPrivateEvents("game-1", "server-42") } returns emptyFlow()
+        coEvery { repository.subscribeToPrivateEvents("game-1", "server-42") } returns activeJsonFlow()
 
         val viewModel = createViewModel(
             gameId = "game-1",
@@ -101,7 +102,7 @@ class GameBoardViewModelTest {
             )
         )
         coEvery { repository.fetchGameState("game-1", "client-temp") } returns state
-        coEvery { repository.subscribeToPrivateEvents("game-1", "client-temp") } returns emptyFlow()
+        coEvery { repository.subscribeToPrivateEvents("game-1", "client-temp") } returns activeJsonFlow()
 
         val viewModel = createViewModel(
             gameId = "game-1",
@@ -125,7 +126,7 @@ class GameBoardViewModelTest {
         coEvery { repository.connect() } throws RuntimeException("timeout") andThen Unit
         coEvery { repository.disconnect() } just Runs
         coEvery { repository.fetchGameState("game-1", "player-1") } returns state
-        coEvery { repository.subscribeToPrivateEvents("game-1", "player-1") } returns emptyFlow()
+        coEvery { repository.subscribeToPrivateEvents("game-1", "player-1") } returns activeJsonFlow()
 
         val viewModel = createViewModel(
             gameId = "game-1",
@@ -167,4 +168,10 @@ class GameBoardViewModelTest {
             .apply { isAccessible = true }
             .invoke(viewModel)
     }
+
+    private fun activeGameStateFlow() = flow<GameState> { awaitCancellation() }
+
+    private fun activeStringFlow() = flow<String> { awaitCancellation() }
+
+    private fun activeJsonFlow() = flow<org.json.JSONObject> { awaitCancellation() }
 }

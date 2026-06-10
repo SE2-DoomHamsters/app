@@ -680,4 +680,9 @@ open class GameBoardViewModel(
         val matchingPlayers = snapshot.players.filter { it.name == localPlayerName }
         return matchingPlayers.singleOrNull()?.id
     }
+
+    private val _pendingTargetedCard = MutableStateFlow<Card?>(null)
+    val pendingTargetedCard: StateFlow<Card?> = _pendingTargetedCard
+
+
 }

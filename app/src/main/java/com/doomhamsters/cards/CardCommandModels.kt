@@ -11,6 +11,7 @@ data class CardCommandRequest(
     val cardId: String?,
     val cardType: CardType,
     val commandId: CardCommandId,
+    val parameters: Map<String, String> = emptyMap()
     val parameters: JSONObject = JSONObject()
 ) {
     /** Serializes this command request into the backend JSON format. */

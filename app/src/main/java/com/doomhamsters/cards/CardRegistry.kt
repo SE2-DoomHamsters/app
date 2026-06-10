@@ -19,6 +19,7 @@ object CardRegistry {
         SnackStashCardDefinition,
         PowerNapCardDefinition,
         QuickPeekCardDefinition,
+        BegForSnacksCardDefinition,
         NormalCardDefinition
     )
 

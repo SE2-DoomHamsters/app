@@ -10,6 +10,7 @@ enum class CardType {
     SnackStash,
     PowerNap,
     QuickPeek,
+    FourHamsters,
     Normal;
 
     companion object {

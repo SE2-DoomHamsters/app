@@ -90,6 +90,10 @@ open class GameBoardViewModel(
 
     private val _cardCommandNotice = MutableStateFlow<CardCommandNotice?>(null)
     val cardCommandNotice: StateFlow<CardCommandNotice?> = _cardCommandNotice
+    private val _showTargetSelectionDialog = MutableStateFlow(false)
+    val showTargetSelectionDialog: StateFlow<Boolean> = _showTargetSelectionDialog
+    private val _selectedCardForActivation = MutableStateFlow<Card?>(null)
+    val selectedCardForActivation: StateFlow<Card?> = _selectedCardForActivation
     private val _isActivatingCard = MutableStateFlow(false)
     private var awaitingLocalDrawOutcome = false
     private var doomOutcomeLogged = false
@@ -582,10 +586,15 @@ open class GameBoardViewModel(
     }
 
     /** Sends the activation request for a playable card. */
-    fun activateCard(card: Card) {
+    fun activateCard(card: Card,parameters: Map<String, Any> = emptyMap()) {
         val command = CardRegistry.commandFor(card) ?: return
         if (!canActivateCard(card)) {
             Log.d(tag, "Activate card ignored gameId=$gameId cardId=${card.id} cardType=${card.type}")
+            return
+        }
+        if (card.type == CardType.StealCard && !parameters.containsKey("targetPlayerId")) {
+            _selectedCardForActivation.value = card
+            _showTargetSelectionDialog.value = true
             return
         }
 
@@ -601,8 +610,13 @@ open class GameBoardViewModel(
                         cardId = card.id,
                         cardType = card.type,
                         commandId = command.id
-                    ).toJson()
-                )
+                    ).toJson().apply {
+                        if (parameters.isNotEmpty()) {
+                            val paramsJson = JSONObject()
+                            parameters.forEach { (key, value) -> paramsJson.put(key, value) }
+                            put("parameters", paramsJson) // 'put' packt es direkt in das fertige toJson()
+                        }
+                    })
                 broadcastLatestState()
             } catch (e: Exception) {
                 Log.e(tag, "Card activation failed gameId=$gameId playerId=$localPlayerId cardId=${card.id}", e)
@@ -611,6 +625,20 @@ open class GameBoardViewModel(
                 _isActivatingCard.value = false
             }
         }
+    }
+    fun selectStealTarget(targetPlayerId: String) {
+        val card = _selectedCardForActivation.value ?: return
+        _showTargetSelectionDialog.value = false // Dialog schließen
+
+        // Jetzt feuern wir die Karte ab – diesmal MIT dem Parameter!
+        activateCard(card, mapOf("targetPlayerId" to targetPlayerId))
+        _selectedCardForActivation.value = null
+    }
+
+    /** Wird aufgerufen, wenn der Spieler den Auswahldialog abbricht */
+    fun dismissTargetSelection() {
+        _showTargetSelectionDialog.value = false
+        _selectedCardForActivation.value = null
     }
 
     /** Advances the local Doom flow after the player acknowledges the current notice. */

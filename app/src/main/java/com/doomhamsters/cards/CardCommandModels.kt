@@ -20,7 +20,8 @@ data class CardCommandRequest(
         cardId?.let { put("cardId", it) }
         put("cardType", cardType.name)
         put("commandId", commandId.name)
-        put("parameters", parameters)
+        if (parameters.isNotEmpty()) {
+            put("parameters", JSONObject(parameters as Map<*, *>))
     }
 }
 

@@ -637,29 +637,7 @@ open class GameBoardViewModel(
         }
     }
 
-        viewModelScope.launch {
-            try {
-                _isActivatingCard.value = true
-                Log.d(tag, "Sending card activation gameId=$gameId playerId=$localPlayerId cardId=${card.id} commandId=${command.id}")
-                repository.sendAction(
-                    gameId,
-                    command.actionPath,
-                    CardCommandRequest(
-                        playerId = localPlayerId,
-                        cardId = card.id,
-                        cardType = card.type,
-                        commandId = command.id
-                    ).toJson()
-                )
-                broadcastLatestState()
-            } catch (e: Exception) {
-                Log.e(tag, "Card activation failed gameId=$gameId playerId=$localPlayerId cardId=${card.id}", e)
-                _error.emit("Card activation failed: ${e.message}")
-            } finally {
-                _isActivatingCard.value = false
-            }
-        }
-    }
+
 
     /** Advances the local Doom flow after the player acknowledges the current notice. */
     fun dismissDoomNotice(selectedPlayerCardIndex: Int = -1) {

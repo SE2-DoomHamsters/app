@@ -589,6 +589,54 @@ open class GameBoardViewModel(
             return
         }
 
+        // Cards that need a target player + card type go through the selection dialog first
+        if (command.requiresTargetPlayer || command.requiresCardType) {
+            _pendingTargetedCard.value = card
+            return
+        }
+
+        sendCardActivation(card, emptyMap())
+    }
+
+    /** Called by the UI once the player has chosen a target and card type. */
+    fun activateCardWithTargets(card: Card, targetPlayerId: String, requestedCardType: String) {
+        _pendingTargetedCard.value = null
+        if (!canActivateCard(card)) return
+        sendCardActivation(card, mapOf("targetPlayerId" to targetPlayerId, "cardType" to requestedCardType))
+    }
+
+    /** Cancels a pending targeted-card selection. */
+    fun cancelTargetedCardSelection() {
+        _pendingTargetedCard.value = null
+    }
+
+    private fun sendCardActivation(card: Card, extraParameters: Map<String, String>) {
+        val command = CardRegistry.commandFor(card) ?: return
+        viewModelScope.launch {
+            try {
+                _isActivatingCard.value = true
+                Log.d(tag, "Sending card activation gameId=$gameId playerId=$localPlayerId cardId=${card.id} commandId=${command.id}")
+                repository.sendAction(
+                    gameId,
+                    command.actionPath,
+                    CardCommandRequest(
+                        playerId = localPlayerId,
+                        cardId = card.id,
+                        cardType = card.type,
+                        commandId = command.id,
+                        parameters = extraParameters
+                    ).toJson()
+                )
+                broadcastLatestState()
+            } catch (e: Exception) {
+                Log.e(tag, "Card activation failed gameId=$gameId playerId=$localPlayerId cardId=${card.id}", e)
+                _error.emit("Card activation failed: ${e.message}")
+            } finally {
+                _isActivatingCard.value = false
+            }
+        }
+    }
+
         viewModelScope.launch {
             try {
                 _isActivatingCard.value = true

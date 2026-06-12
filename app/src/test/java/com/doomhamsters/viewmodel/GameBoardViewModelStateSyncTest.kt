@@ -586,7 +586,7 @@ class GameBoardViewModelStateSyncTest {
                 currentPlayerId = localPlayerId,
                 localHand = listOf(stealCard),
                 localHandSizeHint = 1,
-                remoteHandSizeHint = 3 // Der Gegner braucht Karten, damit man klauen kann
+                remoteHandSizeHint = 3
             )
 
             coEvery { repository.connect() } just Runs
@@ -602,11 +602,10 @@ class GameBoardViewModelStateSyncTest {
             )
             advanceUntilIdle()
 
-            // ACT: Klick auf die Karte
             viewModel.activateCard(stealCard)
             advanceUntilIdle()
 
-            // ASSERT: Dialog geht auf, Karte wird als ausgewählt markiert, NICHTS wird an den Server gesendet
+
             assertEquals(true, viewModel.showTargetSelectionDialog.value)
             assertEquals(stealCard, viewModel.selectedCardForActivation.value)
             coVerify(exactly = 0) { repository.sendAction(any(), any(), any()) }
@@ -622,11 +621,9 @@ class GameBoardViewModelStateSyncTest {
             localHandSizeHint = 1
         )
 
-        // ---> HIER WAREN DIE FEHLENDEN ZEILEN: <---
         coEvery { repository.connect() } just Runs
         coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
         coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
-        // ------------------------------------------
 
         coEvery { repository.fetchGameState("game-1", localPlayerId) } returns initialState
 
@@ -638,15 +635,11 @@ class GameBoardViewModelStateSyncTest {
         )
         advanceUntilIdle()
 
-        // ARRANGE: Dialog ist offen
         viewModel.activateCard(stealCard)
         advanceUntilIdle()
 
-        // ACT: Abbrechen klicken
         viewModel.dismissTargetSelection()
         advanceUntilIdle()
-
-        // ASSERT: State ist aufgeräumt, keine Aktion gesendet
         assertEquals(false, viewModel.showTargetSelectionDialog.value)
         assertEquals(null, viewModel.selectedCardForActivation.value)
         coVerify(exactly = 0) { repository.sendAction(any(), any(), any()) }
@@ -677,20 +670,15 @@ class GameBoardViewModelStateSyncTest {
         )
         advanceUntilIdle()
 
-        // ARRANGE: Dialog öffnen
         viewModel.activateCard(stealCard)
         advanceUntilIdle()
 
-        // ACT: Ziel auswählen
         viewModel.selectStealTarget(targetPlayerId)
         advanceUntilIdle()
 
-        // ASSERT:
-        // 1. Dialog ist wieder zu
         assertEquals(false, viewModel.showTargetSelectionDialog.value)
         assertEquals(null, viewModel.selectedCardForActivation.value)
 
-        // 2. Das JSON-Paket an den Server enthält den Parameter
         coVerify {
             repository.sendAction(
                 "game-1",

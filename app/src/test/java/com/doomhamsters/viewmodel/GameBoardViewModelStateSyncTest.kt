@@ -578,6 +578,131 @@ class GameBoardViewModelStateSyncTest {
             pendingDoomRequiresInsertion = pendingDoomRequiresInsertion,
             pendingDoomCardId = pendingDoomCardId
         )
+    }@Test
+    fun `steal card activates target selection dialog without sending action`() = runTest {
+            val localPlayerId = "player-1"
+            val stealCard = Card(CardType.StealCard, id = "sc-1", name = "Steal Card", effectId = "STEAL_CARD")
+            val initialState = gameState(
+                currentPlayerId = localPlayerId,
+                localHand = listOf(stealCard),
+                localHandSizeHint = 1,
+                remoteHandSizeHint = 3 // Der Gegner braucht Karten, damit man klauen kann
+            )
+
+            coEvery { repository.connect() } just Runs
+            coEvery { repository.fetchGameState("game-1", localPlayerId) } returns initialState
+            coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+            coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+
+            val viewModel = createViewModel(
+                gameId = "game-1",
+                initialLocalPlayerId = localPlayerId,
+                localPlayerName = "Local",
+                repository = repository
+            )
+            advanceUntilIdle()
+
+            // ACT: Klick auf die Karte
+            viewModel.activateCard(stealCard)
+            advanceUntilIdle()
+
+            // ASSERT: Dialog geht auf, Karte wird als ausgewählt markiert, NICHTS wird an den Server gesendet
+            assertEquals(true, viewModel.showTargetSelectionDialog.value)
+            assertEquals(stealCard, viewModel.selectedCardForActivation.value)
+            coVerify(exactly = 0) { repository.sendAction(any(), any(), any()) }
+        }
+
+    @Test
+    fun `dismiss target selection clears dialog state without sending action`() = runTest {
+        val localPlayerId = "player-1"
+        val stealCard = Card(CardType.StealCard, id = "sc-1", name = "Steal Card", effectId = "STEAL_CARD")
+        val initialState = gameState(
+            currentPlayerId = localPlayerId,
+            localHand = listOf(stealCard),
+            localHandSizeHint = 1
+        )
+
+        // ---> HIER WAREN DIE FEHLENDEN ZEILEN: <---
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+        // ------------------------------------------
+
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returns initialState
+
+        val viewModel = createViewModel(
+            gameId = "game-1",
+            initialLocalPlayerId = localPlayerId,
+            localPlayerName = "Local",
+            repository = repository
+        )
+        advanceUntilIdle()
+
+        // ARRANGE: Dialog ist offen
+        viewModel.activateCard(stealCard)
+        advanceUntilIdle()
+
+        // ACT: Abbrechen klicken
+        viewModel.dismissTargetSelection()
+        advanceUntilIdle()
+
+        // ASSERT: State ist aufgeräumt, keine Aktion gesendet
+        assertEquals(false, viewModel.showTargetSelectionDialog.value)
+        assertEquals(null, viewModel.selectedCardForActivation.value)
+        coVerify(exactly = 0) { repository.sendAction(any(), any(), any()) }
+    }
+
+    @Test
+    fun `select steal target sends card activation with target parameter and closes dialog`() = runTest {
+        val localPlayerId = "player-1"
+        val targetPlayerId = "player-2"
+        val stealCard = Card(CardType.StealCard, id = "sc-1", name = "Steal Card", effectId = "STEAL_CARD")
+        val initialState = gameState(
+            currentPlayerId = localPlayerId,
+            localHand = listOf(stealCard),
+            localHandSizeHint = 1
+        )
+
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returns initialState
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+        coEvery { repository.sendAction(any(), any(), any()) } just Runs
+
+        val viewModel = createViewModel(
+            gameId = "game-1",
+            initialLocalPlayerId = localPlayerId,
+            localPlayerName = "Local",
+            repository = repository
+        )
+        advanceUntilIdle()
+
+        // ARRANGE: Dialog öffnen
+        viewModel.activateCard(stealCard)
+        advanceUntilIdle()
+
+        // ACT: Ziel auswählen
+        viewModel.selectStealTarget(targetPlayerId)
+        advanceUntilIdle()
+
+        // ASSERT:
+        // 1. Dialog ist wieder zu
+        assertEquals(false, viewModel.showTargetSelectionDialog.value)
+        assertEquals(null, viewModel.selectedCardForActivation.value)
+
+        // 2. Das JSON-Paket an den Server enthält den Parameter
+        coVerify {
+            repository.sendAction(
+                "game-1",
+                "card/activate",
+                match {
+                    it.getString("playerId") == localPlayerId &&
+                            it.getString("cardId") == "sc-1" &&
+                            it.getString("commandId") == "STEAL_CARD" &&
+                            it.getJSONObject("parameters").getString("targetPlayerId") == targetPlayerId
+                }
+            )
+        }
     }
 
     private fun createViewModel(

@@ -99,6 +99,9 @@ open class GameBoardViewModel(
         connectAndObserveRemoteState()
     }
 
+    private val _pendingTargetedCard = MutableStateFlow<Card?>(null)
+    val pendingTargetedCard: StateFlow<Card?> = _pendingTargetedCard
+
     private fun connectAndObserveRemoteState() {
         viewModelScope.launch {
             val connected = establishInitialConnection()

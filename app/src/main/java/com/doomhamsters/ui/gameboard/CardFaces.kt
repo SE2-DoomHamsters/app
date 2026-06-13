@@ -60,6 +60,11 @@ fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: 
         CardType.SnackStash -> Triple(SnackStashColor, Color(0xFFA3C968), CardDarkMaroon)
         CardType.PowerNap -> Triple(Color(0xFFB8D8E8), Color(0xFF6A9FB5), CardDarkMaroon)
         CardType.QuickPeek -> Triple(Color(0xFFF8E7A2), Color(0xFFD6A93A), CardDarkMaroon)
+        CardType.HamsterFat,
+        CardType.HamsterNinja,
+        CardType.HamsterSleepy,
+        CardType.HamsterGremlin,
+        CardType.HamsterZombi -> Triple(Color(0xFFD4A8D0), Color(0xFF9B6B96), CardDarkMaroon)
         CardType.Normal -> Triple(BackgroundCream, AccentOrange, CardDarkMaroon)
     }
 

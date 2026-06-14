@@ -459,7 +459,9 @@ open class GameBoardViewModel(
             _pendingDoom.value != null ||
                 _gameState.value?.resolvingDoomPlayerId == localPlayerId
 
-        if (playerId != localPlayerId || !_isLocalPlayersTurn.value || isResolvingLocalDoom) {
+        if (playerId != localPlayerId || !_isLocalPlayersTurn.value || isResolvingLocalDoom||
+            awaitingLocalDrawOutcome ||
+            _isActivatingCard.value) {
             Log.d(
                 tag,
                 "Draw ignored gameId=$gameId requestedPlayerId=$playerId localPlayerId=$localPlayerId isLocalPlayersTurn=${_isLocalPlayersTurn.value} isResolvingLocalDoom=$isResolvingLocalDoom"

@@ -128,7 +128,7 @@ fun GameBoard(
     val cardCommandNotice by viewModel.cardCommandNotice.collectAsState()
     var latestError by remember { mutableStateOf<String?>(null) }
     val connectionStatus by viewModel.connectionStatus.collectAsState()
-
+    val showTargetSelectionDialog by viewModel.showTargetSelectionDialog.collectAsState()
     var selectedPlayerCardIndex by remember { mutableIntStateOf(-1) }
     var doomSliderPosition by remember { mutableFloatStateOf(0f) }
     var deckCenter by remember { mutableStateOf<Offset?>(null) }
@@ -358,7 +358,33 @@ fun GameBoard(
                         onCardCommandDismiss = viewModel::dismissCardCommandNotice
                     )
                 )
+                if (showTargetSelectionDialog) {
+                    val opponents = state.players.filter { it.id != viewModel.localPlayerId }
 
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { viewModel.dismissTargetSelection() },
+                        title = { Text("Ziel auswählen", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Column {
+                                Text("Von wem möchtest du eine Karte klauen?")
+                                Spacer(modifier = Modifier.height(16.dp))
+                                opponents.forEach { opponent ->
+                                    androidx.compose.material3.Button(
+                                        onClick = { viewModel.selectStealTarget(opponent.id) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(opponent.name)
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            androidx.compose.material3.TextButton(onClick = { viewModel.dismissTargetSelection() }) {
+                                Text("Abbrechen")
+                            }
+                        }
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

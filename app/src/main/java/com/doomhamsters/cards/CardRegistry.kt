@@ -9,6 +9,7 @@ import com.doomhamsters.cards.definitions.NormalCardDefinition
 import com.doomhamsters.cards.definitions.PowerNapCardDefinition
 import com.doomhamsters.cards.definitions.QuickPeekCardDefinition
 import com.doomhamsters.cards.definitions.SnackStashCardDefinition
+import com.doomhamsters.cards.definitions.HamsterTrioCardDefinition
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 

@@ -4,7 +4,7 @@ package com.doomhamsters.cards
 /** Lists the supported activatable card command identifiers. */
 enum class CardCommandId {
     POWER_NAP,
-    HAMSTER_TRIO;
+    HAMSTER_TRIO,
     QUICK_PEEK;
 
     companion object {

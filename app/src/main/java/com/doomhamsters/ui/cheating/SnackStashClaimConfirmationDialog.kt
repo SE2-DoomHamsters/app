@@ -8,9 +8,29 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontWeight
 import com.doomhamsters.cheating.presentation.SnackStashClaimConfirmationCopy
+import com.doomhamsters.cheating.presentation.SnackStashClaimDialogState
+import com.doomhamsters.model.Card
 import com.doomhamsters.ui.theme.AccentOrange
 import com.doomhamsters.ui.theme.BackgroundCream
 import com.doomhamsters.ui.theme.CardDarkMaroon
+
+@Composable
+fun SnackStashClaimDialogHost(
+    state: SnackStashClaimDialogState?,
+    onClaimCard: (Card) -> Unit,
+    onClose: () -> Unit
+) {
+    state?.let { dialogState ->
+        SnackStashClaimConfirmationDialog(
+            copy = dialogState.copy,
+            onConfirm = {
+                onClaimCard(dialogState.selectedCard)
+                onClose()
+            },
+            onDismiss = onClose
+        )
+    }
+}
 
 /** Confirms how the selected hand card should be used during Doom resolution. */
 @Composable

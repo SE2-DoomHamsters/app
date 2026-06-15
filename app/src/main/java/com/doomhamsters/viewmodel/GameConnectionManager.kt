@@ -7,8 +7,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONObject
-import kotlin.compareTo
 
 sealed class ConnectionStatus {
     object Connected : ConnectionStatus()
@@ -36,26 +34,22 @@ class GameConnectionManager(private val gameId: String,
                                                onLog: (String) -> Unit) {
         var attempt = 0
         while (attempt <= maxReconnectAttempts) {
-            // --- RECONNECT PHASE ---
             if (attempt > 0) {
                 _connectionStatus.value = ConnectionStatus.Reconnecting(attempt, maxReconnectAttempts)
                 val delayMs = reconnectBackoffMs.getOrElse(attempt - 1) { reconnectBackoffMs.last() }
-                delay(delayMs) // wait 1s, 2s, 4s before trying again
+                delay(delayMs)
                 try {
-                    runCatching { repository.disconnect() } // connection may be dead
+                    runCatching { repository.disconnect() }
                     repository.connect()
 
-                    // Callback statt refreshGameState
                     onReconnect()
 
                     _connectionStatus.value = ConnectionStatus.Connected
-
-                    // Callback statt addLog
                     onLog("Reconnected.")
 
                     attempt = 0
                 } catch (e: CancellationException) {
-                    throw e // ViewModel is being destroyed
+                    throw e
                 } catch (e: Exception) {
                     Log.e(tag, "Reconnect attempt $attempt/$maxReconnectAttempts failed gameId=$gameId", e)
                     attempt++
@@ -63,13 +57,11 @@ class GameConnectionManager(private val gameId: String,
                 }
             }
 
-            // --- SUBSCRIPTION PHASE ---
             try {
                 coroutineScope {
                     launch {
                         repository.subscribeToGameState(gameId)
                             .collect { state ->
-                                // Callback statt applyGameState
                                 onGameStateReceived(state)
                             }
                     }
@@ -78,7 +70,6 @@ class GameConnectionManager(private val gameId: String,
                             .collect { payload ->
                                 runCatching { org.json.JSONObject(payload) }.getOrNull()
                                     ?.let { event ->
-                                        // Callback statt handlePublicGameEvent
                                         onPublicEventReceived(event)
                                     }
                             }
@@ -86,7 +77,6 @@ class GameConnectionManager(private val gameId: String,
                     launch {
                         repository.subscribeToPrivateEvents(gameId, localPlayerId)
                             .collect { event ->
-                                // Callback statt handlePrivateEvent
                                 onPrivateEventReceived(event)
                             }
                     }
@@ -95,19 +85,16 @@ class GameConnectionManager(private val gameId: String,
                 _connectionStatus.value = ConnectionStatus.Disconnected
                 attempt++
             } catch (e: CancellationException) {
-                throw e // ViewModel destroyed
+                throw e
             } catch (e: Exception) {
                 Log.w(tag, "Subscription lost attempt=$attempt/$maxReconnectAttempts gameId=$gameId", e)
                 _connectionStatus.value = ConnectionStatus.Disconnected
                 attempt++
             }
         }
-
-        // --- ALL ATTEMPTS EXHAUSTED ---
         Log.e(tag, "Max reconnect attempts exhausted gameId=$gameId")
         _connectionStatus.value = ConnectionStatus.Failed
 
-        // Callback statt _error.emit
         onFatalError("The hamster died of heart attack. RIP... Please restart the game.")
     }
     suspend fun connectAndMaintain(
@@ -121,7 +108,6 @@ class GameConnectionManager(private val gameId: String,
         onFatalError: suspend (String) -> Unit,
         onLog: (String) -> Unit
     ) {
-        // 1. Erstmalig verbinden
         val connected = establishInitialConnection(localPlayerId, localPlayerName, onFatalError)
         if (!connected) {
             _connectionStatus.value = ConnectionStatus.Failed
@@ -129,10 +115,8 @@ class GameConnectionManager(private val gameId: String,
         }
         _connectionStatus.value = ConnectionStatus.Connected
 
-        // 2. Initiale Daten laden
         onInitialConnect()
 
-        // 3. Subscriptions starten und bei Abbruch neu verbinden
         subscribeWithReconnect(
             localPlayerId = localPlayerId,
             onReconnect = onReconnect,
@@ -176,6 +160,4 @@ class GameConnectionManager(private val gameId: String,
         onFatalError("Connection error: ${finalError.message}")
         return false
     }
-
-    // Hier kommt gleich die connectAndMaintain Methode hin...
 }

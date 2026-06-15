@@ -2,6 +2,7 @@ package com.doomhamsters.cards
 
 
 
+import com.doomhamsters.cards.definitions.CageSwapCardDefinition
 import com.doomhamsters.cards.definitions.CardCommandDefinition
 import com.doomhamsters.cards.definitions.CardDefinition
 import com.doomhamsters.cards.definitions.DoomCardDefinition
@@ -19,6 +20,7 @@ object CardRegistry {
         SnackStashCardDefinition,
         PowerNapCardDefinition,
         QuickPeekCardDefinition,
+        CageSwapCardDefinition,
         NormalCardDefinition
     )
 

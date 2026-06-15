@@ -4,6 +4,10 @@ package com.doomhamsters.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import com.doomhamsters.ui.gameboard.*
+import com.doomhamsters.ui.cheating.SnackStashClaimDialogHost
+import com.doomhamsters.cheating.presentation.SnackStashClaimConfirmationDialogPresentation
+import com.doomhamsters.cheating.presentation.SnackStashHandSelectionState
+import com.doomhamsters.cheating.presentation.SnackStashNoticeOverlayPresentation
 import com.doomhamsters.ui.theme.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -29,7 +33,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import com.doomhamsters.viewmodel.ConnectionStatus
-import com.doomhamsters.cards.CardCommandNotice
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.GameState
 import com.doomhamsters.model.CardType
@@ -46,32 +49,6 @@ private sealed interface GameBoardResolution {
 
     data class Status(val message: String) : GameBoardResolution
 }
-
-private data class BoardOverlayState(
-    val pendingDoom: Card?,
-    val pendingDoomMessage: String?,
-    val pendingDoomRequiresSelection: Boolean,
-    val pendingDoomRequiresInsertionUi: Boolean,
-    val pausedRemotePlayerName: String?,
-    val pausedForDoomPlayerName: String?,
-    val pausedForDoomMessage: String?,
-    val pausedForDoomDetail: String?,
-    val cardCommandNotice: CardCommandNotice?
-)
-
-private data class BoardOverlayContext(
-    val currentPlayer: Player,
-    val deckSize: Int,
-    val selectedPlayerCardIndex: Int,
-    val doomSliderPosition: Float
-)
-
-private data class BoardOverlayCallbacks(
-    val onDoomSliderChange: (Float) -> Unit,
-    val onDoomConfirmed: () -> Unit,
-    val onDoomDismiss: () -> Unit,
-    val onCardCommandDismiss: () -> Unit
-)
 
 private data class HandDrawState(
     val localAnimatingCardIndex: Int,
@@ -95,6 +72,7 @@ private data class LocalPlayerAreaInputs(
     val pendingDoomRequiresSelection: Boolean,
     val isResolvingLocalDoom: Boolean,
     val isLifeLossDoomOverlay: Boolean,
+    val isSnackStashClaimPending: Boolean,
     val localAnimatingCardIndex: Int,
     val localDrawStartOffset: Offset?,
     val drawProgress: Float
@@ -126,14 +104,26 @@ fun GameBoard(
     val pausedForDoomMessage by viewModel.pausedForDoomMessage.collectAsState()
     val pausedForDoomDetail by viewModel.pausedForDoomDetail.collectAsState()
     val cardCommandNotice by viewModel.cardCommandNotice.collectAsState()
+    val pendingSnackStashClaim by viewModel.snackStash.pendingClaim.collectAsState()
+    val snackStashResolutionNotice by viewModel.snackStash.resolutionNotice.collectAsState()
     var latestError by remember { mutableStateOf<String?>(null) }
     val connectionStatus by viewModel.connectionStatus.collectAsState()
 
     var selectedPlayerCardIndex by remember { mutableIntStateOf(-1) }
+    var snackStashConfirmationCardIndex by remember { mutableIntStateOf(-1) }
     var doomSliderPosition by remember { mutableFloatStateOf(0f) }
     var deckCenter by remember { mutableStateOf<Offset?>(null) }
     var localHandCenter by remember { mutableStateOf<Offset?>(null) }
     var opponentHandCenter by remember { mutableStateOf<Offset?>(null) }
+
+    fun applySnackStashHandSelection(selection: SnackStashHandSelectionState) {
+        selectedPlayerCardIndex = selection.selectedPlayerCardIndex
+        snackStashConfirmationCardIndex = selection.claimConfirmationCardIndex
+    }
+
+    fun clearSnackStashHandSelection() {
+        applySnackStashHandSelection(SnackStashClaimConfirmationDialogPresentation.clearedHandSelection())
+    }
 
     LaunchedEffect(viewModel) {
         launch {
@@ -196,11 +186,22 @@ fun GameBoard(
                 pendingDoom != null &&
                     !pendingDoomRequiresSelection &&
                     !pendingDoomRequiresInsertionUi
+            val snackStashNoticeState = SnackStashNoticeOverlayPresentation.state(
+                pendingClaim = pendingSnackStashClaim,
+                resolution = snackStashResolutionNotice,
+                localPlayerId = localPlayer.id
+            )
+            val snackStashClaimDialogState = SnackStashClaimConfirmationDialogPresentation.state(
+                hand = localPlayer.hand,
+                selectedCardIndex = snackStashConfirmationCardIndex,
+                pendingDoomRequiresSelection = pendingDoomRequiresSelection,
+                pendingClaim = pendingSnackStashClaim
+            )
 
             ResetDoomInteractionState(
                 isResolvingLocalDoom = isResolvingLocalDoom,
                 pendingDoomRequiresSelection = pendingDoomRequiresSelection,
-                onResetSelection = { selectedPlayerCardIndex = -1 },
+                onResetSelection = ::clearSnackStashHandSelection,
                 onResetSlider = { doomSliderPosition = 0f }
             )
 
@@ -228,7 +229,7 @@ fun GameBoard(
                 deckSize = state.deckSize,
                 isResolvingLocalDoom = isResolvingLocalDoom,
                 localPlayerId = localPlayer.id,
-                onResetSelection = { selectedPlayerCardIndex = -1 },
+                onResetSelection = ::clearSnackStashHandSelection,
                 onDraw = viewModel::draw
             )
             val overlayState = BoardOverlayState(
@@ -240,7 +241,8 @@ fun GameBoard(
                 pausedForDoomPlayerName = pausedForDoomPlayerName,
                 pausedForDoomMessage = pausedForDoomMessage,
                 pausedForDoomDetail = pausedForDoomDetail,
-                cardCommandNotice = cardCommandNotice
+                cardCommandNotice = cardCommandNotice,
+                snackStashNoticeState = snackStashNoticeState
             )
             val localPlayerAreaContent = buildLocalPlayerAreaContent(
                 inputs = LocalPlayerAreaInputs(
@@ -250,6 +252,7 @@ fun GameBoard(
                     pendingDoomRequiresSelection = pendingDoomRequiresSelection,
                     isResolvingLocalDoom = isResolvingLocalDoom,
                     isLifeLossDoomOverlay = isLifeLossDoomOverlay,
+                    isSnackStashClaimPending = pendingSnackStashClaim != null,
                     localAnimatingCardIndex = handDrawState.localAnimatingCardIndex,
                     localDrawStartOffset = localDrawStartOffset,
                     drawProgress = handDrawState.progress
@@ -258,10 +261,17 @@ fun GameBoard(
                     onHandCenterMeasured = { localHandCenter = it },
                     canActivateCard = viewModel::canActivateCard,
                     onCardSelectionToggle = { index ->
-                        selectedPlayerCardIndex = if (selectedPlayerCardIndex == index) -1 else index
+                        applySnackStashHandSelection(
+                            SnackStashClaimConfirmationDialogPresentation.handSelectionAfterToggle(
+                                currentSelectedCardIndex = selectedPlayerCardIndex,
+                                toggledCardIndex = index,
+                                pendingDoomRequiresSelection = pendingDoomRequiresSelection,
+                                pendingClaim = pendingSnackStashClaim
+                            )
+                        )
                     },
                     onCardActivated = { card ->
-                        selectedPlayerCardIndex = -1
+                        clearSnackStashHandSelection()
                         viewModel.activateCard(card)
                     }
                 )
@@ -352,11 +362,20 @@ fun GameBoard(
                         onDoomConfirmed = {
                             viewModel.insertDoom(doomSliderPosition.toInt())
                             doomSliderPosition = 0f
-                            selectedPlayerCardIndex = -1
+                            clearSnackStashHandSelection()
                         },
                         onDoomDismiss = { viewModel.dismissDoomNotice(selectedPlayerCardIndex) },
-                        onCardCommandDismiss = viewModel::dismissCardCommandNotice
+                        onAcceptDoom = viewModel.snackStash::acceptDoom,
+                        onCardCommandDismiss = viewModel::dismissCardCommandNotice,
+                        onSnackStashVote = viewModel.snackStash::vote,
+                        onSnackStashResolutionDismiss = viewModel.snackStash::dismissResolutionNotice
                     )
+                )
+
+                SnackStashClaimDialogHost(
+                    state = snackStashClaimDialogState,
+                    onClaimCard = viewModel.snackStash::claim,
+                    onClose = ::clearSnackStashHandSelection
                 )
 
                 Box(
@@ -429,7 +448,7 @@ private fun buildLocalPlayerAreaContent(
             selectedIndex = inputs.selectedPlayerCardIndex,
             disableDefocus = inputs.pendingDoomRequiresSelection,
             suppressTooltip = inputs.isResolvingLocalDoom,
-            interactionEnabled = !inputs.isLifeLossDoomOverlay,
+            interactionEnabled = !inputs.isLifeLossDoomOverlay && !inputs.isSnackStashClaimPending,
             onCenterMeasured = callbacks.onHandCenterMeasured
         ),
         handAnimationConfig = FannedHandAnimationConfig(
@@ -570,60 +589,6 @@ private suspend fun runDrawAnimation(drawAnimatable: Animatable<Float, Animation
         targetValue = 1f,
         animationSpec = tween(800, easing = FastOutSlowInEasing)
     )
-}
-
-@Composable
-private fun BoardOverlays(
-    overlayState: BoardOverlayState,
-    context: BoardOverlayContext,
-    callbacks: BoardOverlayCallbacks
-) {
-    when {
-        overlayState.pendingDoom != null && overlayState.pendingDoomRequiresInsertionUi -> {
-            DoomOverlay(
-                state = DoomOverlayState(
-                    pendingDoom = overlayState.pendingDoom,
-                    deckSize = context.deckSize,
-                    currentPlayer = context.currentPlayer,
-                    selectedPlayerCardIndex = context.selectedPlayerCardIndex,
-                    hasDefused = true,
-                    doomSliderPosition = context.doomSliderPosition
-                ),
-                onDefuseTriggered = {},
-                onDoomSliderChange = callbacks.onDoomSliderChange,
-                onDoomConfirmed = callbacks.onDoomConfirmed,
-                onAcceptDoom = {}
-            )
-        }
-
-        overlayState.pendingDoom != null && overlayState.pendingDoomMessage != null -> {
-            DoomResolvedOverlay(
-                card = overlayState.pendingDoom,
-                currentPlayer = context.currentPlayer,
-                selectedPlayerCardIndex = context.selectedPlayerCardIndex,
-                message = overlayState.pendingDoomMessage,
-                requiresSnackSelection = overlayState.pendingDoomRequiresSelection,
-                onDismiss = callbacks.onDoomDismiss
-            )
-        }
-
-        overlayState.pausedForDoomPlayerName != null &&
-            overlayState.pausedForDoomMessage != null &&
-            overlayState.pausedForDoomDetail != null -> {
-            RemoteDoomPauseOverlay(
-                playerName = overlayState.pausedRemotePlayerName ?: overlayState.pausedForDoomPlayerName,
-                message = overlayState.pausedForDoomMessage,
-                detail = overlayState.pausedForDoomDetail
-            )
-        }
-    }
-
-    overlayState.cardCommandNotice?.let { notice ->
-        CardCommandNoticeOverlay(
-            notice = notice,
-            onDismiss = callbacks.onCardCommandDismiss
-        )
-    }
 }
 
 @Composable

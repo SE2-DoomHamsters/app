@@ -1,5 +1,4 @@
 package com.doomhamsters.cards
-import com.doomhamsters.cards.CardCommandId
 import com.doomhamsters.cards.definitions.CageSwapCardDefinition
 import com.doomhamsters.model.CardType
 import org.junit.jupiter.api.Assertions.assertEquals

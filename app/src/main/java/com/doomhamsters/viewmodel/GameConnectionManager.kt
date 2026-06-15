@@ -1,0 +1,181 @@
+package com.doomhamsters.viewmodel
+import android.util.Log
+import com.doomhamsters.GameRepository
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import org.json.JSONObject
+import kotlin.compareTo
+
+sealed class ConnectionStatus {
+    object Connected : ConnectionStatus()
+    object Disconnected : ConnectionStatus()
+    data class Reconnecting(val attempt: Int, val maxAttempts: Int) : ConnectionStatus()
+    object Failed : ConnectionStatus()
+}
+class GameConnectionManager(private val gameId: String,
+                            private val repository: GameRepository
+) {
+    private val tag = "GameConnectionManager"
+
+    private val _connectionStatus = MutableStateFlow<ConnectionStatus>(ConnectionStatus.Disconnected)
+    val connectionStatus: StateFlow<ConnectionStatus> = _connectionStatus
+
+    val initialConnectionRetryDelaysMs = listOf(0L, 5_000L, 10_000L, 15_000L)
+    private val maxReconnectAttempts = 3
+    val reconnectBackoffMs = listOf(5_000L, 10_000L, 15_000L)
+    private suspend fun subscribeWithReconnect(localPlayerId: String,
+                                               onReconnect: suspend () -> Unit,
+                                               onGameStateReceived: suspend (com.doomhamsters.model.GameState) -> Unit,
+                                               onPublicEventReceived: suspend (org.json.JSONObject) -> Unit,
+                                               onPrivateEventReceived: suspend (org.json.JSONObject) -> Unit,
+                                               onFatalError: suspend (String) -> Unit,
+                                               onLog: (String) -> Unit) {
+        var attempt = 0
+        while (attempt <= maxReconnectAttempts) {
+            // --- RECONNECT PHASE ---
+            if (attempt > 0) {
+                _connectionStatus.value = ConnectionStatus.Reconnecting(attempt, maxReconnectAttempts)
+                val delayMs = reconnectBackoffMs.getOrElse(attempt - 1) { reconnectBackoffMs.last() }
+                delay(delayMs) // wait 1s, 2s, 4s before trying again
+                try {
+                    runCatching { repository.disconnect() } // connection may be dead
+                    repository.connect()
+
+                    // Callback statt refreshGameState
+                    onReconnect()
+
+                    _connectionStatus.value = ConnectionStatus.Connected
+
+                    // Callback statt addLog
+                    onLog("Reconnected.")
+
+                    attempt = 0
+                } catch (e: CancellationException) {
+                    throw e // ViewModel is being destroyed
+                } catch (e: Exception) {
+                    Log.e(tag, "Reconnect attempt $attempt/$maxReconnectAttempts failed gameId=$gameId", e)
+                    attempt++
+                    continue
+                }
+            }
+
+            // --- SUBSCRIPTION PHASE ---
+            try {
+                coroutineScope {
+                    launch {
+                        repository.subscribeToGameState(gameId)
+                            .collect { state ->
+                                // Callback statt applyGameState
+                                onGameStateReceived(state)
+                            }
+                    }
+                    launch {
+                        repository.subscribeToGame(gameId)
+                            .collect { payload ->
+                                runCatching { org.json.JSONObject(payload) }.getOrNull()
+                                    ?.let { event ->
+                                        // Callback statt handlePublicGameEvent
+                                        onPublicEventReceived(event)
+                                    }
+                            }
+                    }
+                    launch {
+                        repository.subscribeToPrivateEvents(gameId, localPlayerId)
+                            .collect { event ->
+                                // Callback statt handlePrivateEvent
+                                onPrivateEventReceived(event)
+                            }
+                    }
+                }
+                Log.w(tag, "Subscriptions completed attempt=$attempt/$maxReconnectAttempts gameId=$gameId")
+                _connectionStatus.value = ConnectionStatus.Disconnected
+                attempt++
+            } catch (e: CancellationException) {
+                throw e // ViewModel destroyed
+            } catch (e: Exception) {
+                Log.w(tag, "Subscription lost attempt=$attempt/$maxReconnectAttempts gameId=$gameId", e)
+                _connectionStatus.value = ConnectionStatus.Disconnected
+                attempt++
+            }
+        }
+
+        // --- ALL ATTEMPTS EXHAUSTED ---
+        Log.e(tag, "Max reconnect attempts exhausted gameId=$gameId")
+        _connectionStatus.value = ConnectionStatus.Failed
+
+        // Callback statt _error.emit
+        onFatalError("The hamster died of heart attack. RIP... Please restart the game.")
+    }
+    suspend fun connectAndMaintain(
+        localPlayerId: String,
+        localPlayerName: String,
+        onInitialConnect: suspend () -> Unit,
+        onReconnect: suspend () -> Unit,
+        onGameStateReceived: suspend (com.doomhamsters.model.GameState) -> Unit,
+        onPublicEventReceived: suspend (org.json.JSONObject) -> Unit,
+        onPrivateEventReceived: suspend (org.json.JSONObject) -> Unit,
+        onFatalError: suspend (String) -> Unit,
+        onLog: (String) -> Unit
+    ) {
+        // 1. Erstmalig verbinden
+        val connected = establishInitialConnection(localPlayerId, localPlayerName, onFatalError)
+        if (!connected) {
+            _connectionStatus.value = ConnectionStatus.Failed
+            return
+        }
+        _connectionStatus.value = ConnectionStatus.Connected
+
+        // 2. Initiale Daten laden
+        onInitialConnect()
+
+        // 3. Subscriptions starten und bei Abbruch neu verbinden
+        subscribeWithReconnect(
+            localPlayerId = localPlayerId,
+            onReconnect = onReconnect,
+            onGameStateReceived = onGameStateReceived,
+            onPublicEventReceived = onPublicEventReceived,
+            onPrivateEventReceived = onPrivateEventReceived,
+            onFatalError = onFatalError,
+            onLog = onLog
+        )}
+    private suspend fun establishInitialConnection(localPlayerId: String,
+                                                   localPlayerName: String,
+                                                   onFatalError: suspend (String) -> Unit): Boolean {
+        var lastError: Exception? = null
+
+        for ((attemptIndex, retryDelayMs) in initialConnectionRetryDelaysMs.withIndex()) {
+            if (retryDelayMs > 0) {
+                delay(retryDelayMs)
+            }
+
+            try {
+                Log.d(
+                    tag,
+                    "Connecting attempt=${attemptIndex + 1}/${initialConnectionRetryDelaysMs.size} gameId=$gameId localPlayerId=$localPlayerId localPlayerName=$localPlayerName"
+                )
+                repository.connect()
+                return true
+            } catch (e: Exception) {
+                lastError = e
+                Log.e(
+                    tag,
+                    "Connection attempt failed attempt=${attemptIndex + 1}/${initialConnectionRetryDelaysMs.size} gameId=$gameId",
+                    e
+                )
+                runCatching { repository.disconnect() }
+            }
+        }
+
+        val finalError = lastError ?: IllegalStateException("Unknown connection error")
+        Log.e(tag, "Connection error gameId=$gameId", finalError)
+        //_error.emit("Connection error: ${finalError.message}")
+        onFatalError("Connection error: ${finalError.message}")
+        return false
+    }
+
+    // Hier kommt gleich die connectAndMaintain Methode hin...
+}

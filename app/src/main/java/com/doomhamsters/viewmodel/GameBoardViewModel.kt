@@ -22,20 +22,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 
 /**
  * Represents the live state of the STOMP/WebSocket connection
  * Guarantees compile-tim exhaustive checks in when() expressions.
  */
-//sealed class ConnectionStatus {
-   // object Connected : ConnectionStatus()
-   // object Disconnected : ConnectionStatus()
-    //data class Reconnecting(val attempt: Int, val maxAttempts: Int) : ConnectionStatus()
-    // object Failed : ConnectionStatus()
-//}
 
 /** Owns realtime game state, local Doom handling, and card actions for the game board. */
 open class GameBoardViewModel(
@@ -45,11 +37,6 @@ open class GameBoardViewModel(
     private val repository: GameRepository,
     private val connectionManager: GameConnectionManager = GameConnectionManager(gameId, repository)
 ) : ViewModel() {
-    private companion object {
-        //val initialConnectionRetryDelaysMs = listOf(0L, 5_000L, 10_000L, 15_000L)
-        //const val maxReconnectAttempts = 3
-        //val reconnectBackoffMs = listOf(5_000L, 10_000L, 15_000L)
-    }
 
     private val tag = "GameBoardViewModel"
 
@@ -67,8 +54,6 @@ open class GameBoardViewModel(
 
     protected val _error = MutableSharedFlow<String>()
     open val error: SharedFlow<String> = _error
-    //private val _connectionStatus = MutableStateFlow<ConnectionStatus>(ConnectionStatus.Connected)
-   // val connectionStatus: StateFlow<ConnectionStatus> = _connectionStatus
     val connectionStatus: StateFlow<ConnectionStatus> = connectionManager.connectionStatus
 
     protected val _log = MutableStateFlow<List<String>>(emptyList())
@@ -119,20 +104,6 @@ open class GameBoardViewModel(
             )
         }
     }
-   // init {
-       // connectAndObserveRemoteState()
-   // }
-
-    //private fun connectAndObserveRemoteState() {
-        //viewModelScope.launch {
-            //val connected = establishInitialConnection()
-            //if (!connected) {
-               // _connectionStatus.value = ConnectionStatus.Failed
-               // return@launch
-          //  }
-          //  subscribeWithReconnect()
-       // }
-   // }
 
     private fun handlePublicGameEvent(event: JSONObject) {
         val parsedEvent = CardCommandEvent.fromJsonOrNull(event) ?: return

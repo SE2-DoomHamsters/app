@@ -586,7 +586,6 @@ open class GameBoardViewModel(
         _pendingDoomRequiresSelection.value = requiresSelection
         _pendingDoomRequiresInsertionUi.value = requiresInsertionUi
     }
-
     private fun clearPendingDoomUi() {
         _pendingDoom.value = null
         _pendingDoomMessage.value = null

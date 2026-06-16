@@ -90,7 +90,6 @@ open class GameBoardViewModel(
 
     private val _cardCommandNotice = MutableStateFlow<CardCommandNotice?>(null)
     val cardCommandNotice: StateFlow<CardCommandNotice?> = _cardCommandNotice
-    private val _isActivatingCard = MutableStateFlow(false)
     private var awaitingLocalDrawOutcome = false
     private var doomOutcomeLogged = false
     private var pendingPrivateDoomCard: Card? = null
@@ -98,6 +97,19 @@ open class GameBoardViewModel(
     init {
         connectAndObserveRemoteState()
     }
+    private val cardActivation = CardActivationHandler(
+        gameId = gameId,
+        repository = repository,
+        scope = viewModelScope,
+        error = _error,
+        getLocalPlayerId = { localPlayerId },
+        getGameState = { _gameState.value },
+        isPendingDoom = { _pendingDoom.value != null },
+        isLocalPlayersTurn = { _isLocalPlayersTurn.value },
+        onStateChanged = { broadcastLatestState() }
+    )
+
+    val pendingTargetedCard: StateFlow<Card?> = cardActivation.pendingTargetedCard
 
     private fun connectAndObserveRemoteState() {
         viewModelScope.launch {
@@ -566,76 +578,21 @@ open class GameBoardViewModel(
     }
 
     /** Returns whether the local player can activate the supplied card right now. */
-    fun canActivateCard(card: Card): Boolean {
-        val state = _gameState.value ?: return false
-        val localPlayer = state.players.firstOrNull { it.id == localPlayerId } ?: return false
-        val isResolvingLocalDoom =
-            _pendingDoom.value != null ||
-                state.resolvingDoomPlayerId == localPlayerId
-        val command = CardRegistry.commandFor(card) ?: return false
-
-        return !_isActivatingCard.value &&
-            !isResolvingLocalDoom &&
-            _isLocalPlayersTurn.value &&
-            localPlayer.hand.any { it.id == card.id || (card.id == null && it == card) } &&
-            command.actionPath.isNotBlank()
-    }
+    fun canActivateCard(card: Card): Boolean = cardActivation.canActivate(card)
 
     /** Sends the activation request for a playable card. */
-    fun activateCard(card: Card) {
-        val command = CardRegistry.commandFor(card) ?: return
-        if (!canActivateCard(card)) {
-            Log.d(tag, "Activate card ignored gameId=$gameId cardId=${card.id} cardType=${card.type}")
-            return
-        }
-
-        // Cards that need a target player + card type go through the selection dialog first
-        if (command.requiresTargetPlayer || command.requiresCardType) {
-            _pendingTargetedCard.value = card
-            return
-        }
-
-        sendCardActivation(card, emptyMap())
-    }
+    fun activateCard(card: Card) = cardActivation.activate(card)
 
     /** Called by the UI once the player has chosen a target and card type. */
-    fun activateCardWithTargets(card: Card, targetPlayerId: String, requestedCardType: String) {
-        _pendingTargetedCard.value = null
-        if (!canActivateCard(card)) return
-        sendCardActivation(card, mapOf("targetPlayerId" to targetPlayerId, "cardType" to requestedCardType))
-    }
+    fun activateCardWithTargets(
+        card: Card,
+        targetPlayerId: String,
+        requestedCardType: String,
+        hamsterType: String? = null
+    ) = cardActivation.activateWithTargets(card, targetPlayerId, requestedCardType, hamsterType)
 
     /** Cancels a pending targeted-card selection. */
-    fun cancelTargetedCardSelection() {
-        _pendingTargetedCard.value = null
-    }
-
-    private fun sendCardActivation(card: Card, extraParameters: Map<String, String>) {
-        val command = CardRegistry.commandFor(card) ?: return
-        viewModelScope.launch {
-            try {
-                _isActivatingCard.value = true
-                Log.d(tag, "Sending card activation gameId=$gameId playerId=$localPlayerId cardId=${card.id} commandId=${command.id}")
-                repository.sendAction(
-                    gameId,
-                    command.actionPath,
-                    CardCommandRequest(
-                        playerId = localPlayerId,
-                        cardId = card.id,
-                        cardType = card.type,
-                        commandId = command.id,
-                        parameters = extraParameters
-                    ).toJson()
-                )
-                broadcastLatestState()
-            } catch (e: Exception) {
-                Log.e(tag, "Card activation failed gameId=$gameId playerId=$localPlayerId cardId=${card.id}", e)
-                _error.emit("Card activation failed: ${e.message}")
-            } finally {
-                _isActivatingCard.value = false
-            }
-        }
-    }
+    fun cancelTargetedCardSelection() = cardActivation.cancelSelection()
 
 
 
@@ -706,9 +663,5 @@ open class GameBoardViewModel(
         val matchingPlayers = snapshot.players.filter { it.name == localPlayerName }
         return matchingPlayers.singleOrNull()?.id
     }
-
-    private val _pendingTargetedCard = MutableStateFlow<Card?>(null)
-    val pendingTargetedCard: StateFlow<Card?> = _pendingTargetedCard
-
 
 }

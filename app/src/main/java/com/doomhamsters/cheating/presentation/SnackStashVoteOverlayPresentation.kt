@@ -2,6 +2,7 @@ package com.doomhamsters.cheating.presentation
 
 import com.doomhamsters.cheating.SnackStashClaimEvent
 
+/** Display-ready content for a pending Snack Stash vote overlay. */
 data class SnackStashVoteDisplay(
     val claimId: String,
     val message: String,
@@ -9,12 +10,14 @@ data class SnackStashVoteDisplay(
     val action: SnackStashVoteAction
 )
 
+/** Vote action available to the local player for the current claim. */
 enum class SnackStashVoteAction {
     CAN_VOTE,
     LOCAL_CLAIM,
     ALREADY_VOTED
 }
 
+/** Maps a pending Snack Stash claim to display content for the vote overlay. */
 object SnackStashVoteOverlayPresentation {
     fun display(
         claim: SnackStashClaimEvent,

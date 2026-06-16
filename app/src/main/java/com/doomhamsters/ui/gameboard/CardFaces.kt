@@ -60,6 +60,7 @@ fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: 
         CardType.SnackStash -> Triple(SnackStashColor, Color(0xFFA3C968), CardDarkMaroon)
         CardType.PowerNap -> Triple(Color(0xFFB8D8E8), Color(0xFF6A9FB5), CardDarkMaroon)
         CardType.QuickPeek -> Triple(Color(0xFFF8E7A2), Color(0xFFD6A93A), CardDarkMaroon)
+        CardType.SignOfFate -> Triple(Color(0xFFDCC8FF), Color(0xFF8B6BC7), CardDarkMaroon)
         CardType.Normal -> Triple(BackgroundCream, AccentOrange, CardDarkMaroon)
     }
 

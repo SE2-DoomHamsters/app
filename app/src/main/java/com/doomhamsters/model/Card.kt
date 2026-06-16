@@ -9,6 +9,7 @@ enum class CardType {
     Doom,
     SnackStash,
     PowerNap,
+    BegForSnacks,
     QuickPeek,
     Normal;
 
@@ -19,6 +20,7 @@ enum class CardType {
             "SNACK_STASH", "SNACKSTASH" -> SnackStash
             "POWER_NAP", "POWERNAP" -> PowerNap
             "QUICK_PEEK", "QUICKPEEK" -> QuickPeek
+            "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)
         }

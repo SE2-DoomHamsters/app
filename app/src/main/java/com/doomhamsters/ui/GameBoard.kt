@@ -7,31 +7,17 @@ import com.doomhamsters.ui.gameboard.*
 import com.doomhamsters.ui.theme.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import com.doomhamsters.viewmodel.ConnectionStatus
-import com.doomhamsters.model.Card
 import com.doomhamsters.model.GameState
-import com.doomhamsters.model.CardType
 import com.doomhamsters.model.Player
 import com.doomhamsters.viewmodel.GameBoardViewModel
 import kotlinx.coroutines.launch
@@ -54,33 +40,6 @@ private data class HandDrawState(
     val progress: Float
 )
 
-private data class PlayerAreaContent(
-    val player: Player,
-    val playerName: String,
-    val handUiConfig: FannedHandUiConfig,
-    val handAnimationConfig: FannedHandAnimationConfig,
-    val handCallbacks: FannedHandCallbacks
-)
-
-private data class LocalPlayerAreaInputs(
-    val player: Player,
-    val playerName: String,
-    val selectedPlayerCardIndex: Int,
-    val pendingDoomRequiresSelection: Boolean,
-    val isResolvingLocalDoom: Boolean,
-    val isLifeLossDoomOverlay: Boolean,
-    val localAnimatingCardIndex: Int,
-    val localDrawStartOffset: Offset?,
-    val drawProgress: Float
-)
-
-private data class LocalPlayerAreaCallbacks(
-    val onHandCenterMeasured: (Offset) -> Unit,
-    val canActivateCard: (Card) -> Boolean,
-    val onCardSelectionToggle: (Int) -> Unit,
-    val onCardActivated: (Card) -> Unit
-)
-
 /** Renders the live game board for the local player. */
 @Composable
 fun GameBoard(
@@ -90,18 +49,30 @@ fun GameBoard(
     onGameOver: (String) -> Unit,
     onLeaveGame: () -> Unit = {}
 ) {
-    val gameState by viewModel.gameState.collectAsState()
-    val isLocalPlayersTurn by viewModel.isLocalPlayersTurn.collectAsState()
-    val pendingDoom by viewModel.pendingDoom.collectAsState()
-    val pendingDoomMessage by viewModel.pendingDoomMessage.collectAsState()
-    val pendingDoomRequiresSelection by viewModel.pendingDoomRequiresSelection.collectAsState()
-    val pendingDoomRequiresInsertionUi by viewModel.pendingDoomRequiresInsertionUi.collectAsState()
-    val pausedForDoomPlayerName by viewModel.pausedForDoomPlayerName.collectAsState()
-    val pausedForDoomMessage by viewModel.pausedForDoomMessage.collectAsState()
-    val pausedForDoomDetail by viewModel.pausedForDoomDetail.collectAsState()
-    val cardCommandNotice by viewModel.cardCommandNotice.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
+    val gameState = uiState.gameState
+    val isLocalPlayersTurn = uiState.isLocalPlayersTurn
+    val pendingDoom = uiState.pendingDoom
+    val pendingDoomMessage = uiState.pendingDoomMessage
+    val pendingDoomRequiresSelection = uiState.pendingDoomRequiresSelection
+    val pendingDoomRequiresInsertionUi = uiState.pendingDoomRequiresInsertionUi
+    val pausedForDoomPlayerName = uiState.pausedForDoomPlayerName
+    val pausedForDoomMessage = uiState.pausedForDoomMessage
+    val pausedForDoomDetail = uiState.pausedForDoomDetail
+    val cardCommandNotice = uiState.cardCommandNotice
+    val connectionStatus = uiState.connectionStatus
+   //val gameState by viewModel.gameState.collectAsState()
+    //val isLocalPlayersTurn by viewModel.isLocalPlayersTurn.collectAsState()
+    //val pendingDoom by viewModel.pendingDoom.collectAsState()
+    //val pendingDoomMessage by viewModel.pendingDoomMessage.collectAsState()
+    //val pendingDoomRequiresSelection by viewModel.pendingDoomRequiresSelection.collectAsState()
+    //val pendingDoomRequiresInsertionUi by viewModel.pendingDoomRequiresInsertionUi.collectAsState()
+    //val pausedForDoomPlayerName by viewModel.pausedForDoomPlayerName.collectAsState()
+    //val pausedForDoomMessage by viewModel.pausedForDoomMessage.collectAsState()
+    //val pausedForDoomDetail by viewModel.pausedForDoomDetail.collectAsState()
+    //val cardCommandNotice by viewModel.cardCommandNotice.collectAsState()
     var latestError by remember { mutableStateOf<String?>(null) }
-    val connectionStatus by viewModel.connectionStatus.collectAsState()
+    //val connectionStatus by viewModel.connectionStatus.collectAsState()
 
     var selectedPlayerCardIndex by remember { mutableIntStateOf(-1) }
     var doomSliderPosition by remember { mutableFloatStateOf(0f) }
@@ -394,35 +365,6 @@ private fun createDrawHandler(
     }
 }
 
-private fun buildLocalPlayerAreaContent(
-    inputs: LocalPlayerAreaInputs,
-    callbacks: LocalPlayerAreaCallbacks
-): PlayerAreaContent {
-    return PlayerAreaContent(
-        player = inputs.player,
-        playerName = inputs.playerName,
-        handUiConfig = FannedHandUiConfig(
-            isOpponent = false,
-            selectedIndex = inputs.selectedPlayerCardIndex,
-            disableDefocus = inputs.pendingDoomRequiresSelection,
-            suppressTooltip = inputs.isResolvingLocalDoom,
-            interactionEnabled = !inputs.isLifeLossDoomOverlay,
-            onCenterMeasured = callbacks.onHandCenterMeasured
-        ),
-        handAnimationConfig = FannedHandAnimationConfig(
-            drawAnimation = inputs.localAnimatingCardIndex.takeIf { it >= 0 }?.let { index ->
-                index to (inputs.localDrawStartOffset ?: Offset.Zero)
-            },
-            drawProgress = { inputs.drawProgress }
-        ),
-        handCallbacks = FannedHandCallbacks(
-            canActivateCard = callbacks.canActivateCard,
-            onCardSelected = callbacks.onCardSelectionToggle,
-            onCardActivated = callbacks.onCardActivated
-        )
-    )
-}
-
 @Composable
 private fun ResetDoomInteractionState(
     isResolvingLocalDoom: Boolean,
@@ -442,29 +384,6 @@ private fun ResetDoomInteractionState(
             onResetSelection()
         }
     }
-}
-
-@Composable
-private fun rememberTopOpponent(
-    players: List<Player>,
-    localPlayerId: String,
-    currentTurnPlayerId: String
-): Player? {
-    val fallbackOpponent = players.firstOrNull { it.id != localPlayerId }
-    val activeOpponent = players.firstOrNull { it.id == currentTurnPlayerId && it.id != localPlayerId }
-    var lastActiveOpponentId by remember(localPlayerId) { mutableStateOf<String?>(null) }
-
-    LaunchedEffect(activeOpponent?.id, fallbackOpponent?.id, players.size) {
-        lastActiveOpponentId = when {
-            activeOpponent != null -> activeOpponent.id
-            lastActiveOpponentId == null -> fallbackOpponent?.id
-            players.none { it.id == lastActiveOpponentId && it.id != localPlayerId } -> fallbackOpponent?.id
-            else -> lastActiveOpponentId
-        }
-    }
-
-    return players.firstOrNull { it.id == lastActiveOpponentId && it.id != localPlayerId }
-        ?: fallbackOpponent
 }
 
 private fun resolvePausedRemotePlayerName(
@@ -549,153 +468,6 @@ private suspend fun runDrawAnimation(drawAnimatable: Animatable<Float, Animation
     )
 }
 
-
-
-@Composable
-private fun GameBoardStatus(message: String, onLeaveGame: () -> Unit = {}) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundCream)
-            .padding(24.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            CircularProgressIndicator(color = AccentOrange)
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyLarge,
-                color = OutlineDark
-            )
-            androidx.compose.material3.OutlinedButton(onClick = onLeaveGame) {
-                Text("New Game")
-            }
-        }
-    }
-}
-
-@Composable
-private fun OpponentArea(
-    opponent: Player?,
-    opponentName: String?,
-    drawAnimation: Pair<Int, Offset>?,
-    drawProgress: () -> Float,
-    onHandCenterMeasured: (Offset) -> Unit
-) {
-    if (opponent == null) return
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(220.dp)
-    ) {
-        val opponentDummyHand = List(opponent.visibleHandSize()) { Card(CardType.Normal) }
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .offset(y = -300.dp)
-                .graphicsLayer {
-                    rotationZ = 180f
-                }
-        ) {
-            FannedHand(
-                cards = opponentDummyHand,
-                uiConfig = FannedHandUiConfig(
-                    isOpponent = true,
-                    selectedIndex = -1,
-                    onCenterMeasured = onHandCenterMeasured
-                ),
-                animationConfig = FannedHandAnimationConfig(
-                    drawAnimation = drawAnimation,
-                    drawProgress = drawProgress
-                )
-            )
-        }
-        PlayerLabel(
-            name = opponentName ?: opponent.name,
-            lives = opponent.lives,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 40.dp)
-                .zIndex(1f)
-        )
-    }
-}
-
-@Composable
-private fun CenterPlayArea(
-    deckSize: Int,
-    isLocalPlayersTurn: Boolean,
-    currentTurnPlayerName: String,
-    visibleTurns: List<Player>,
-    playerAvatars: Map<String, String>,
-    onDrawClick: () -> Unit,
-    onDeckCenterMeasured: (Offset) -> Unit
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(18.dp)
-        ) {
-            DrawDeck(
-                deckSize = deckSize,
-                onClick = onDrawClick,
-                modifier = Modifier.onGloballyPositioned { coordinates ->
-                    val position = coordinates.positionInRoot()
-                    val center = position + Offset(
-                        x = coordinates.size.width / 2f,
-                        y = coordinates.size.height / 2f
-                    )
-                    onDeckCenterMeasured(center)
-                }
-            )
-            TurnTracker(
-                visibleTurns = visibleTurns,
-                playerAvatars = playerAvatars
-            )
-        }
-        Text(
-            text = if (isLocalPlayersTurn) {
-                "YOUR TURN - TAP DECK TO DRAW"
-            } else {
-                "WAITING FOR $currentTurnPlayerName"
-            },
-            color = OutlineDark,
-            fontWeight = FontWeight.Bold,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(top = 16.dp, bottom = 16.dp)
-        )
-    }
-}
-
-private fun buildVisibleTurnOrder(
-    players: List<Player>,
-    currentTurnPlayerId: String?,
-    currentPlayerIndex: Int,
-    futureTurnCount: Int = 6
-): List<Player> {
-    if (players.isEmpty()) return emptyList()
-
-    val currentIndex = players.indexOfFirst { it.id == currentTurnPlayerId }
-        .takeIf { it >= 0 }
-        ?: currentPlayerIndex.coerceIn(0, players.lastIndex)
-
-    val alivePlayersInOrder = buildList {
-        repeat(players.size) { offset ->
-            val player = players[(currentIndex + offset) % players.size]
-            if (player.isAlive()) add(player)
-        }
-    }
-
-    if (alivePlayersInOrder.size <= 1) return alivePlayersInOrder
-
-    return List(futureTurnCount) { index ->
-        alivePlayersInOrder[index % alivePlayersInOrder.size]
-    }
-}
-
 @Composable
 private fun BoxScope.DecorativeSideBorders() {
     Box(
@@ -716,86 +488,4 @@ private fun BoxScope.DecorativeSideBorders() {
             .padding(end = 8.dp)
             .zIndex(5f)
     )
-}
-
-@Composable
-private fun PlayerArea(
-    content: PlayerAreaContent
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Canvas(modifier = Modifier.fillMaxWidth().height(100.dp).offset(y = 50.dp)) {
-            drawOval(
-                color = CardDarkMaroon,
-                topLeft = Offset(-size.width * 0.5f, 0f),
-                size = Size(size.width * 2f, size.height * 2f)
-            )
-        }
-    }
-
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Box(
-            contentAlignment = Alignment.BottomCenter,
-            modifier = Modifier.fillMaxWidth().offset(y = 58.dp)
-        ) {
-            FannedHand(
-                cards = content.player.hand,
-                uiConfig = content.handUiConfig,
-                animationConfig = content.handAnimationConfig,
-                callbacks = content.handCallbacks
-            )
-        }
-
-        PlayerLabel(
-            name = content.playerName,
-            lives = content.player.lives,
-            modifier = Modifier.padding(bottom = 8.dp).zIndex(200f)
-        )
-    }
-}
-
-@Composable
-private fun ConnectionStatusBanner(status: ConnectionStatus) {
-    AnimatedVisibility(
-        visible = status != ConnectionStatus.Connected,
-        enter = slideInVertically(initialOffsetY = { -it}),
-        exit = slideOutVertically(targetOffsetY = { -it })
-    ) {
-        val background = if (status is ConnectionStatus.Failed) DoomColor else AccentOrange
-        val text = when (status) {
-            is ConnectionStatus.Reconnecting ->
-                "Reconnection\u2026 (${status.attempt}/${status.maxAttempts})"
-            ConnectionStatus.Disconnected -> "Connection lost\u2026"
-            ConnectionStatus.Failed -> "Connection failed. The hamster has died. RIP. Please restart."
-            ConnectionStatus.Connected -> ""
-        }
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(background)
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (status is ConnectionStatus.Reconnecting) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(14.dp),
-                    color = SoftWhite,
-                    strokeWidth = 2.dp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            Text(
-                text = text,
-                color = SoftWhite,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
 }

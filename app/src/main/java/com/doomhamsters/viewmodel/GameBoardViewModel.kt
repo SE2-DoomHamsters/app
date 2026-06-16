@@ -1,5 +1,4 @@
 package com.doomhamsters.viewmodel
-
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,6 +23,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import com.doomhamsters.ui.gameboard.GameBoardUiState
 import org.json.JSONObject
 
 /**
@@ -90,6 +93,38 @@ open class GameBoardViewModel(
 
     private val _cardCommandNotice = MutableStateFlow<CardCommandNotice?>(null)
     val cardCommandNotice: StateFlow<CardCommandNotice?> = _cardCommandNotice
+
+    val uiState: StateFlow<GameBoardUiState> = combine(
+        _gameState,
+        _isLocalPlayersTurn,
+        _pendingDoom,
+        _pendingDoomMessage,
+        _pendingDoomRequiresSelection,
+        _pendingDoomRequiresInsertionUi,
+        _pausedForDoomPlayerName,
+        _pausedForDoomMessage,
+        _pausedForDoomDetail,
+        _cardCommandNotice,
+        _connectionStatus
+    ) { flows ->
+        GameBoardUiState(
+            gameState = flows[0] as GameState?,
+            isLocalPlayersTurn = flows[1] as Boolean,
+            pendingDoom = flows[2] as Card?,
+            pendingDoomMessage = flows[3] as String?,
+            pendingDoomRequiresSelection = flows[4] as Boolean,
+            pendingDoomRequiresInsertionUi = flows[5] as Boolean,
+            pausedForDoomPlayerName = flows[6] as String?,
+            pausedForDoomMessage = flows[7] as String?,
+            pausedForDoomDetail = flows[8] as String?,
+            cardCommandNotice = flows[9] as CardCommandNotice?,
+            connectionStatus = flows[10] as ConnectionStatus
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = GameBoardUiState()
+    )
     private var awaitingLocalDrawOutcome = false
     private var doomOutcomeLogged = false
     private var pendingPrivateDoomCard: Card? = null

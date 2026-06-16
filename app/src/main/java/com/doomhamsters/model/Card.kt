@@ -10,6 +10,7 @@ enum class CardType {
     SnackStash,
     PowerNap,
     QuickPeek,
+    SignOfFate,
     Normal;
 
     companion object {

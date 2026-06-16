@@ -37,7 +37,8 @@ data class CardCommandEvent(
     val playerName: String?,
     val message: String?,
     val card: Card?,
-    val revealedCard: Card?
+    val revealedCard: Card?,
+    val revealedCards: List<Card> = emptyList()
 ) {
     companion object {
         /** Parses a backend JSON payload into a card-command event when possible. */
@@ -45,6 +46,15 @@ data class CardCommandEvent(
             val type = runCatching {
                 CardCommandEventType.valueOf(json.optString("type").trim().uppercase())
             }.getOrNull() ?: return null
+
+            val revealedCardsArray = json.optJSONArray("revealedCards")
+            val revealedCards = buildList {
+                if (revealedCardsArray != null) {
+                    for (i in 0 until revealedCardsArray.length()) {
+                        revealedCardsArray.optJSONObject(i)?.let { add(Card.fromJson(it)) }
+                    }
+                }
+            }
 
             return CardCommandEvent(
                 type = type,
@@ -57,7 +67,8 @@ data class CardCommandEvent(
                 playerName = json.optNullableString("playerName"),
                 message = json.optNullableString("message"),
                 card = json.optJSONObject("card")?.let(Card::fromJson),
-                revealedCard = json.optJSONObject("revealedCard")?.let(Card::fromJson)
+                revealedCard = json.optJSONObject("revealedCard")?.let(Card::fromJson),
+                revealedCards = revealedCards
             )
         }
 
@@ -70,5 +81,6 @@ data class CardCommandEvent(
 data class CardCommandNotice(
     val title: String,
     val message: String,
-    val revealedCard: Card? = null
+    val revealedCard: Card? = null,
+    val revealedCards: List<Card> = emptyList()
 )

@@ -113,9 +113,15 @@ class GameConnectionManager(private val gameId: String,
             _connectionStatus.value = ConnectionStatus.Failed
             return
         }
-        _connectionStatus.value = ConnectionStatus.Connected
-
-        onInitialConnect()
+        try {
+            _connectionStatus.value = ConnectionStatus.Connected
+            onInitialConnect()
+        } catch (e: Exception) {
+            Log.e(tag, "Error in onInitialConnect callback", e)
+            onFatalError("Initialization failed: ${e.message}")
+            _connectionStatus.value = ConnectionStatus.Failed
+            return
+        }
 
         subscribeWithReconnect(
             localPlayerId = localPlayerId,

@@ -156,6 +156,10 @@ open class GameBoardViewModel(
                         repository.subscribeToPrivateEvents(gameId, localPlayerId)
                             .collect { event -> runCatching { handlePrivateEvent(event) } }
                     }
+                    launch {
+                        repository.subscribeToErrors(gameId, localPlayerId)
+                            .collect { message -> handleServerError(message) }
+                    }
                 }
                 Log.w(
                     tag,
@@ -227,6 +231,11 @@ open class GameBoardViewModel(
         addLog(message)
     }
 
+
+    private suspend fun handleServerError(message: String) {
+        addLog("Error: $message")
+        _error.emit(message)
+    }
 
     private fun handlePrivateEvent(event: JSONObject) {
         when (event.optString("type").trim().uppercase()) {

@@ -12,6 +12,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -127,6 +129,7 @@ fun GameBoard(
     val pausedForDoomDetail by viewModel.pausedForDoomDetail.collectAsState()
     val cardCommandNotice by viewModel.cardCommandNotice.collectAsState()
     var latestError by remember { mutableStateOf<String?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
     val connectionStatus by viewModel.connectionStatus.collectAsState()
 
     var selectedPlayerCardIndex by remember { mutableIntStateOf(-1) }
@@ -137,7 +140,10 @@ fun GameBoard(
 
     LaunchedEffect(viewModel) {
         launch {
-            viewModel.error.collect { latestError = it }
+            viewModel.error.collect { message ->
+                latestError = message
+                snackbarHostState.showSnackbar(message)
+            }
         }
         launch {
             viewModel.gameOver.collect(onGameOver)
@@ -366,6 +372,13 @@ fun GameBoard(
                 ) {
                     PlayerArea(content = localPlayerAreaContent)
                 }
+
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .zIndex(10f)
+                )
             }
         }
     }

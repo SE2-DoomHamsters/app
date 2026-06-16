@@ -14,6 +14,7 @@ import com.doomhamsters.ui.theme.AccentOrange
 import com.doomhamsters.ui.theme.BackgroundCream
 import com.doomhamsters.ui.theme.CardDarkMaroon
 
+/** Shows the claim confirmation dialog when presentation state is available. */
 @Composable
 fun SnackStashClaimDialogHost(
     state: SnackStashClaimDialogState?,

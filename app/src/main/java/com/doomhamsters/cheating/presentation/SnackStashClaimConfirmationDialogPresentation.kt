@@ -5,22 +5,26 @@ import com.doomhamsters.cheating.SnackStashClaimEvent
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 
+/** Prepared state for showing the Snack Stash claim confirmation dialog. */
 data class SnackStashClaimDialogState(
     val selectedCard: Card,
     val copy: SnackStashClaimConfirmationCopy
 )
 
+/** Selected hand-card indexes used by GameBoard while resolving a Snack Stash claim. */
 data class SnackStashHandSelectionState(
     val selectedPlayerCardIndex: Int,
     val claimConfirmationCardIndex: Int
 )
 
+/** Text shown by the Snack Stash claim confirmation dialog. */
 data class SnackStashClaimConfirmationCopy(
     val title: String,
     val message: String,
     val confirmLabel: String
 )
 
+/** Builds dialog state, copy, and hand-selection state for the claim confirmation UI. */
 object SnackStashClaimConfirmationDialogPresentation {
     fun state(
         hand: List<Card>,

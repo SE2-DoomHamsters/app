@@ -1,12 +1,7 @@
 package com.doomhamsters.ui
 
-
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
 import com.doomhamsters.ui.gameboard.*
 import com.doomhamsters.ui.theme.*
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Text
@@ -17,28 +12,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import com.doomhamsters.model.GameState
-import com.doomhamsters.model.Player
 import com.doomhamsters.viewmodel.GameBoardViewModel
 import kotlinx.coroutines.launch
 
-private sealed interface GameBoardResolution {
-    data class Ready(
-        val state: GameState,
-        val currentTurnPlayer: Player,
-        val localPlayer: Player
-    ) : GameBoardResolution
-
-    data class Status(val message: String) : GameBoardResolution
-}
-
-
-private data class HandDrawState(
-    val localAnimatingCardIndex: Int,
-    val opponentAnimatingCardIndex: Int,
-    val isAnimatingLocalDraw: Boolean,
-    val progress: Float
-)
 
 /** Renders the live game board for the local player. */
 @Composable
@@ -61,28 +37,11 @@ fun GameBoard(
     val pausedForDoomDetail = uiState.pausedForDoomDetail
     val cardCommandNotice = uiState.cardCommandNotice
     val connectionStatus = uiState.connectionStatus
-   //val gameState by viewModel.gameState.collectAsState()
-    //val isLocalPlayersTurn by viewModel.isLocalPlayersTurn.collectAsState()
-    //val pendingDoom by viewModel.pendingDoom.collectAsState()
-    //val pendingDoomMessage by viewModel.pendingDoomMessage.collectAsState()
-    //val pendingDoomRequiresSelection by viewModel.pendingDoomRequiresSelection.collectAsState()
-    //val pendingDoomRequiresInsertionUi by viewModel.pendingDoomRequiresInsertionUi.collectAsState()
-    //val pausedForDoomPlayerName by viewModel.pausedForDoomPlayerName.collectAsState()
-    //val pausedForDoomMessage by viewModel.pausedForDoomMessage.collectAsState()
-    //val pausedForDoomDetail by viewModel.pausedForDoomDetail.collectAsState()
-    //val cardCommandNotice by viewModel.cardCommandNotice.collectAsState()
-    var latestError by remember { mutableStateOf<String?>(null) }
-    //val connectionStatus by viewModel.connectionStatus.collectAsState()
-
-    var selectedPlayerCardIndex by remember { mutableIntStateOf(-1) }
-    var doomSliderPosition by remember { mutableFloatStateOf(0f) }
-    var deckCenter by remember { mutableStateOf<Offset?>(null) }
-    var localHandCenter by remember { mutableStateOf<Offset?>(null) }
-    var opponentHandCenter by remember { mutableStateOf<Offset?>(null) }
+    val screenState = rememberGameBoardState()
 
     LaunchedEffect(viewModel) {
         launch {
-            viewModel.error.collect { latestError = it }
+            viewModel.error.collect { screenState.latestError = it }
         }
         launch {
             viewModel.gameOver.collect(onGameOver)
@@ -92,7 +51,7 @@ fun GameBoard(
     when (
         val resolution = resolveGameBoardResolution(
             gameState = gameState,
-            latestError = latestError,
+            latestError = screenState.latestError,
             localPlayerId = viewModel.localPlayerId
         )
     ) {
@@ -145,8 +104,8 @@ fun GameBoard(
             ResetDoomInteractionState(
                 isResolvingLocalDoom = isResolvingLocalDoom,
                 pendingDoomRequiresSelection = pendingDoomRequiresSelection,
-                onResetSelection = { selectedPlayerCardIndex = -1 },
-                onResetSlider = { doomSliderPosition = 0f }
+                onResetSelection = { screenState.selectedPlayerCardIndex = -1 },
+                onResetSlider = { screenState.doomSliderPosition = 0f }
             )
 
             val handDrawState = rememberHandDrawState(
@@ -161,11 +120,11 @@ fun GameBoard(
                 currentTurnPlayerId = state.currentTurnPlayerId,
                 currentPlayerIndex = state.currentPlayerIndex
             )
-            val localDrawStartOffset = remember(deckCenter, localHandCenter) {
-                offsetBetween(deckCenter, localHandCenter)
+            val localDrawStartOffset = remember(screenState.deckCenter, screenState.localHandCenter) {
+                offsetBetween(screenState.deckCenter, screenState.localHandCenter)
             }
-            val opponentDrawStartOffset = remember(deckCenter, opponentHandCenter) {
-                offsetBetween(opponentHandCenter, deckCenter)
+            val opponentDrawStartOffset = remember(screenState.deckCenter, screenState.opponentHandCenter) {
+                offsetBetween(screenState.opponentHandCenter, screenState.deckCenter)
             }
             val handleDraw = createDrawHandler(
                 isLocalPlayersTurn = isLocalPlayersTurn,
@@ -173,7 +132,7 @@ fun GameBoard(
                 deckSize = state.deckSize,
                 isResolvingLocalDoom = isResolvingLocalDoom,
                 localPlayerId = localPlayer.id,
-                onResetSelection = { selectedPlayerCardIndex = -1 },
+                onResetSelection = { screenState.selectedPlayerCardIndex = -1 },
                 onDraw = viewModel::draw
             )
             val overlayState = BoardOverlayState(
@@ -191,7 +150,7 @@ fun GameBoard(
                 inputs = LocalPlayerAreaInputs(
                     player = localPlayer,
                     playerName = localPlayerName,
-                    selectedPlayerCardIndex = selectedPlayerCardIndex,
+                    selectedPlayerCardIndex = screenState.selectedPlayerCardIndex,
                     pendingDoomRequiresSelection = pendingDoomRequiresSelection,
                     isResolvingLocalDoom = isResolvingLocalDoom,
                     isLifeLossDoomOverlay = isLifeLossDoomOverlay,
@@ -200,13 +159,13 @@ fun GameBoard(
                     drawProgress = handDrawState.progress
                 ),
                 callbacks = LocalPlayerAreaCallbacks(
-                    onHandCenterMeasured = { localHandCenter = it },
+                    onHandCenterMeasured = { screenState.localHandCenter = it },
                     canActivateCard = viewModel::canActivateCard,
                     onCardSelectionToggle = { index ->
-                        selectedPlayerCardIndex = if (selectedPlayerCardIndex == index) -1 else index
+                        screenState.selectedPlayerCardIndex = if (screenState.selectedPlayerCardIndex == index) -1 else index
                     },
                     onCardActivated = { card ->
-                        selectedPlayerCardIndex = -1
+                        screenState.selectedPlayerCardIndex = -1
                         viewModel.activateCard(card)
                     }
                 )
@@ -234,7 +193,7 @@ fun GameBoard(
                             visibleTurns = visibleTurns,
                             playerAvatars = playerAvatars,
                             onDrawClick = handleDraw,
-                            onDeckCenterMeasured = { deckCenter = it }
+                            onDeckCenterMeasured = { screenState.deckCenter = it }
                         )
                     }
                     Spacer(modifier = Modifier.weight(1.5f))
@@ -255,7 +214,7 @@ fun GameBoard(
                             index to (opponentDrawStartOffset ?: Offset.Zero)
                         },
                         drawProgress = { handDrawState.progress },
-                        onHandCenterMeasured = { opponentHandCenter = it }
+                        onHandCenterMeasured = { screenState.opponentHandCenter = it }
                     )
                 }
 
@@ -289,17 +248,17 @@ fun GameBoard(
                     context = BoardOverlayContext(
                         currentPlayer = localPlayer,
                         deckSize = state.deckSize,
-                        selectedPlayerCardIndex = selectedPlayerCardIndex,
-                        doomSliderPosition = doomSliderPosition
+                        selectedPlayerCardIndex = screenState.selectedPlayerCardIndex,
+                        doomSliderPosition = screenState.doomSliderPosition
                     ),
                     callbacks = BoardOverlayCallbacks(
-                        onDoomSliderChange = { doomSliderPosition = it },
+                        onDoomSliderChange = { screenState.doomSliderPosition = it },
                         onDoomConfirmed = {
-                            viewModel.insertDoom(doomSliderPosition.toInt())
-                            doomSliderPosition = 0f
-                            selectedPlayerCardIndex = -1
+                            viewModel.insertDoom(screenState.doomSliderPosition.toInt())
+                            screenState.doomSliderPosition = 0f
+                            screenState.selectedPlayerCardIndex = -1
                         },
-                        onDoomDismiss = { viewModel.dismissDoomNotice(selectedPlayerCardIndex) },
+                        onDoomDismiss = { viewModel.dismissDoomNotice(screenState.selectedPlayerCardIndex) },
                         onCardCommandDismiss = viewModel::dismissCardCommandNotice,
                         onAcceptDoom = {},
                                 onSnackStashVote = { _, _ -> },
@@ -319,154 +278,6 @@ fun GameBoard(
     }
 }
 
-private fun resolveGameBoardResolution(
-    gameState: GameState?,
-    latestError: String?,
-    localPlayerId: String
-): GameBoardResolution {
-    if (gameState == null) {
-        return GameBoardResolution.Status(latestError ?: "Waiting for game state from server...")
-    }
-
-    val currentTurnPlayer = gameState.players.firstOrNull { it.id == gameState.currentTurnPlayerId }
-        ?: gameState.players.getOrNull(gameState.currentPlayerIndex)
-        ?: return GameBoardResolution.Status("Game state is invalid: current player is missing.")
-
-    val localPlayer = gameState.players.firstOrNull { it.id == localPlayerId }
-        ?: return GameBoardResolution.Status(
-            latestError ?: "Joined game, but player '$localPlayerId' is missing from game state."
-        )
-
-    return GameBoardResolution.Ready(
-        state = gameState,
-        currentTurnPlayer = currentTurnPlayer,
-        localPlayer = localPlayer
-    )
-}
-
-private fun offsetBetween(from: Offset?, to: Offset?): Offset? {
-    return if (from != null && to != null) from - to else null
-}
-
-private fun createDrawHandler(
-    isLocalPlayersTurn: Boolean,
-    isAnimatingLocalDraw: Boolean,
-    deckSize: Int,
-    isResolvingLocalDoom: Boolean,
-    localPlayerId: String,
-    onResetSelection: () -> Unit,
-    onDraw: (String) -> Unit
-): () -> Unit {
-    return {
-        if (isLocalPlayersTurn && !isAnimatingLocalDraw && deckSize > 0 && !isResolvingLocalDoom) {
-            onResetSelection()
-            onDraw(localPlayerId)
-        }
-    }
-}
-
-@Composable
-private fun ResetDoomInteractionState(
-    isResolvingLocalDoom: Boolean,
-    pendingDoomRequiresSelection: Boolean,
-    onResetSelection: () -> Unit,
-    onResetSlider: () -> Unit
-) {
-    LaunchedEffect(isResolvingLocalDoom) {
-        if (isResolvingLocalDoom) {
-            onResetSelection()
-            onResetSlider()
-        }
-    }
-
-    LaunchedEffect(pendingDoomRequiresSelection) {
-        if (!pendingDoomRequiresSelection) {
-            onResetSelection()
-        }
-    }
-}
-
-private fun resolvePausedRemotePlayerName(
-    rawName: String?,
-    players: List<Player>,
-    playerNames: Map<String, String>
-): String? {
-    if (rawName == null) return null
-
-    val matchedPlayer = players.firstOrNull { player ->
-        val displayName = resolvePlayerDisplayName(
-            playerId = player.id,
-            fallbackName = player.name,
-            playerNames = playerNames
-        )
-        displayName == rawName || player.name == rawName || player.id == rawName
-    }
-
-    return matchedPlayer?.let { player ->
-        resolvePlayerDisplayName(
-            playerId = player.id,
-            fallbackName = player.name,
-            playerNames = playerNames
-        )
-    } ?: rawName
-}
-
-@Composable
-private fun rememberHandDrawState(
-    localPlayerId: String,
-    localHandSize: Int,
-    opponentId: String?,
-    opponentVisibleHandSize: Int
-): HandDrawState {
-    val drawAnimatable = remember { Animatable(0f) }
-    var localAnimatingCardIndex by remember(localPlayerId) { mutableIntStateOf(-1) }
-    var opponentAnimatingCardIndex by remember(opponentId) { mutableIntStateOf(-1) }
-    var isAnimatingLocalDraw by remember(localPlayerId) { mutableStateOf(false) }
-    var previousLocalHandSize by remember(localPlayerId) { mutableIntStateOf(localHandSize) }
-    var previousOpponentHandSize by remember(opponentId) { mutableIntStateOf(opponentVisibleHandSize) }
-    var hasInitializedHandTracking by remember(localPlayerId, opponentId) { mutableStateOf(false) }
-
-    LaunchedEffect(localHandSize, opponentVisibleHandSize, opponentId) {
-        if (!hasInitializedHandTracking) {
-            previousLocalHandSize = localHandSize
-            previousOpponentHandSize = opponentVisibleHandSize
-            hasInitializedHandTracking = true
-            return@LaunchedEffect
-        }
-
-        if (localHandSize > previousLocalHandSize && !isAnimatingLocalDraw) {
-            localAnimatingCardIndex = localHandSize - 1
-            isAnimatingLocalDraw = true
-            runDrawAnimation(drawAnimatable)
-            isAnimatingLocalDraw = false
-            localAnimatingCardIndex = -1
-        }
-
-        if (opponentVisibleHandSize > previousOpponentHandSize) {
-            opponentAnimatingCardIndex = opponentVisibleHandSize - 1
-            runDrawAnimation(drawAnimatable)
-            opponentAnimatingCardIndex = -1
-        }
-
-        previousLocalHandSize = localHandSize
-        previousOpponentHandSize = opponentVisibleHandSize
-    }
-
-    return HandDrawState(
-        localAnimatingCardIndex = localAnimatingCardIndex,
-        opponentAnimatingCardIndex = opponentAnimatingCardIndex,
-        isAnimatingLocalDraw = isAnimatingLocalDraw,
-        progress = drawAnimatable.value
-    )
-}
-
-private suspend fun runDrawAnimation(drawAnimatable: Animatable<Float, AnimationVector1D>) {
-    drawAnimatable.snapTo(0f)
-    drawAnimatable.animateTo(
-        targetValue = 1f,
-        animationSpec = tween(800, easing = FastOutSlowInEasing)
-    )
-}
 
 @Composable
 private fun BoxScope.DecorativeSideBorders() {

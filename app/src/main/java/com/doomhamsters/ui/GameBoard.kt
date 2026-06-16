@@ -42,33 +42,14 @@ fun GameBoard(
     val cardCommandNotice = uiState.cardCommandNotice
     val connectionStatus = uiState.connectionStatus
     val screenState = rememberGameBoardState()
-    val gameState by viewModel.gameState.collectAsState()
-    val isLocalPlayersTurn by viewModel.isLocalPlayersTurn.collectAsState()
-    val pendingDoom by viewModel.pendingDoom.collectAsState()
-    val pendingDoomMessage by viewModel.pendingDoomMessage.collectAsState()
-    val pendingDoomRequiresSelection by viewModel.pendingDoomRequiresSelection.collectAsState()
-    val pendingDoomRequiresInsertionUi by viewModel.pendingDoomRequiresInsertionUi.collectAsState()
-    val pausedForDoomPlayerName by viewModel.pausedForDoomPlayerName.collectAsState()
-    val pausedForDoomMessage by viewModel.pausedForDoomMessage.collectAsState()
-    val pausedForDoomDetail by viewModel.pausedForDoomDetail.collectAsState()
-    val cardCommandNotice by viewModel.cardCommandNotice.collectAsState()
-    var latestError by remember { mutableStateOf<String?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
-    val connectionStatus by viewModel.connectionStatus.collectAsState()
-
-    var selectedPlayerCardIndex by remember { mutableIntStateOf(-1) }
-    var doomSliderPosition by remember { mutableFloatStateOf(0f) }
-    var deckCenter by remember { mutableStateOf<Offset?>(null) }
-    var localHandCenter by remember { mutableStateOf<Offset?>(null) }
-    var opponentHandCenter by remember { mutableStateOf<Offset?>(null) }
 
     LaunchedEffect(viewModel) {
         launch {
             viewModel.error.collect { message ->
-                latestError = message
+                screenState.latestError = message
                 snackbarHostState.showSnackbar(message)
             }
-            viewModel.error.collect { screenState.latestError = it }
         }
         launch {
             viewModel.gameOver.collect(onGameOver)

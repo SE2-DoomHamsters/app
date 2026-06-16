@@ -10,6 +10,8 @@ class Deck {
     fun size(): Int = cards.size
     /** Returns the current top card without removing it. */
     fun peekTop(): Card? = cards.lastOrNull()
+    /** Returns up to [n] top cards without removing them, top card first. */
+    fun peekTopN(n: Int): List<Card> = cards.takeLast(n).reversed()
 
     /** Removes and returns the current top card. */
     fun draw(): Card? {

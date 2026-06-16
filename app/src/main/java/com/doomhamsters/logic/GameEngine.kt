@@ -116,4 +116,7 @@ class GameEngine(playerIds: ArrayList<String>) : CardCommandSupport {
     /** Returns the top card of the deck without drawing it. */
     override fun peekTopCard(): Card? = gameState.deck.peekTop()
 
+    /** Returns up to [n] top cards of the deck without drawing them, top card first. */
+    override fun peekTopCards(n: Int): List<Card> = gameState.deck.peekTopN(n)
+
 }

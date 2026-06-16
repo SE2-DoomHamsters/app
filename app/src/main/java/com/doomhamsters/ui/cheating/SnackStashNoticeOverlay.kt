@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import com.doomhamsters.cheating.presentation.SnackStashNoticeKind
 import com.doomhamsters.cheating.presentation.SnackStashNoticeState
 
+/** Routes prepared Snack Stash notice state to the vote or resolution overlay. */
 @Composable
 fun SnackStashNoticeOverlay(
     state: SnackStashNoticeState,

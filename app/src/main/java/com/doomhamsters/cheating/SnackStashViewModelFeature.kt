@@ -6,12 +6,14 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
 
+/** UI side effects requested after the feature handles Snack Stash state or events. */
 sealed interface SnackStashUiEffect {
     object None : SnackStashUiEffect
     object WaitingForVotes : SnackStashUiEffect
     object ClearDoomSelection : SnackStashUiEffect
 }
 
+/** Result of attempting to handle one public game event as a Snack Stash event. */
 data class SnackStashPublicEventResult(
     val handled: Boolean,
     val logMessage: String? = null,

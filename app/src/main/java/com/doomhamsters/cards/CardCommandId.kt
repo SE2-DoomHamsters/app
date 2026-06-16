@@ -4,7 +4,8 @@ package com.doomhamsters.cards
 /** Lists the supported activatable card command identifiers. */
 enum class CardCommandId {
     POWER_NAP,
-    QUICK_PEEK;
+    QUICK_PEEK,
+    SNIFF_AHEAD;
 
     companion object {
         /** Maps backend wire values to a known card command identifier. */

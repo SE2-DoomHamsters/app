@@ -94,7 +94,7 @@ open class GameBoardViewModel(
         _pausedForDoomMessage,
         _pausedForDoomDetail,
         _cardCommandNotice,
-        _connectionStatus
+       // _connectionStatus
     ) { flows ->
         GameBoardUiState(
             gameState = flows[0] as GameState?,

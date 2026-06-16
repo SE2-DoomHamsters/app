@@ -11,6 +11,7 @@ import com.doomhamsters.cards.definitions.QuickPeekCardDefinition
 import com.doomhamsters.cards.definitions.SnackStashCardDefinition
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
+import com.doomhamsters.cards.definitions.SignOfFateCardDefinition
 
 /** Resolves card definitions and command metadata for known cards. */
 object CardRegistry {
@@ -19,6 +20,7 @@ object CardRegistry {
         SnackStashCardDefinition,
         PowerNapCardDefinition,
         QuickPeekCardDefinition,
+        SignOfFateCardDefinition,
         NormalCardDefinition
     )
 

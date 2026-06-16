@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -38,6 +39,7 @@ class GameBoardViewModelTest {
         coEvery { repository.subscribeToGame("game-1") } returns activeStringFlow()
         coEvery { repository.subscribeToGameState("game-1") } returns activeGameStateFlow()
         coEvery { repository.subscribeToPrivateEvents("game-1", any()) } returns activeJsonFlow()
+        coEvery { repository.subscribeToErrors("game-1", any()) } returns activeStringFlow()
     }
 
     @AfterEach
@@ -139,6 +141,31 @@ class GameBoardViewModelTest {
         assertEquals("player-1", viewModel.localPlayerId)
         coVerify(exactly = 2) { repository.connect() }
         coVerify(exactly = 1) { repository.disconnect() }
+    }
+
+    @Test
+    fun `surfaces server error event in the in-game log`() = runTest {
+        val state = gameState(
+            players = arrayListOf(
+                Player(id = "player-1", lives = 3, name = "Alex"),
+                Player(id = "player-2", lives = 3, name = "Remote")
+            )
+        )
+        coEvery { repository.fetchGameState("game-1", "player-1") } returns state
+        coEvery { repository.subscribeToErrors("game-1", "player-1") } returns flow {
+            emit("It is not your turn.")
+            awaitCancellation()
+        }
+
+        val viewModel = createViewModel(
+            gameId = "game-1",
+            initialLocalPlayerId = "player-1",
+            localPlayerName = "Alex",
+            repository = repository
+        )
+        advanceUntilIdle()
+
+        assertTrue(viewModel.log.value.any { it.contains("It is not your turn.") })
     }
 
     private fun gameState(players: ArrayList<Player>): GameState =

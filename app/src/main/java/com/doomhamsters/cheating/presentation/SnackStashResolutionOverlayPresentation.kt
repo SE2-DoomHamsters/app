@@ -3,6 +3,7 @@ package com.doomhamsters.cheating.presentation
 import com.doomhamsters.cheating.SnackStashResolutionEvent
 import com.doomhamsters.cheating.SnackStashResolutionOutcome
 
+/** Display-ready content for the Snack Stash resolution overlay. */
 data class SnackStashResolutionDisplay(
     val title: String,
     val tone: SnackStashResolutionTone,
@@ -10,12 +11,14 @@ data class SnackStashResolutionDisplay(
     val lifeChangeLines: List<String>
 )
 
+/** Visual tone used by the resolution overlay for each claim outcome. */
 enum class SnackStashResolutionTone {
     DOOM,
     SNACK_STASH,
     ACCENT
 }
 
+/** Maps resolved Snack Stash events to display content for the resolution overlay. */
 object SnackStashResolutionOverlayPresentation {
     fun display(resolution: SnackStashResolutionEvent): SnackStashResolutionDisplay {
         return SnackStashResolutionDisplay(

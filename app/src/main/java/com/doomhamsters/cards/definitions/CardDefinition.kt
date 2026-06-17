@@ -20,5 +20,6 @@ data class CardCommandDefinition(
     val requiresTargetPlayer: Boolean = false,
     val requiresCardType: Boolean = false,
     val privateResult: Boolean = false,
+    val requiresHamsterType: Boolean = false,
     val executor: CardCommand? = null
 )

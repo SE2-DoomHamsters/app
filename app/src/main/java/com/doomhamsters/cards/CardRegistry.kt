@@ -5,6 +5,7 @@ package com.doomhamsters.cards
 import com.doomhamsters.cards.definitions.CardCommandDefinition
 import com.doomhamsters.cards.definitions.CardDefinition
 import com.doomhamsters.cards.definitions.DoomCardDefinition
+import com.doomhamsters.cards.definitions.FourHamstersCardDefinition
 import com.doomhamsters.cards.definitions.NormalCardDefinition
 import com.doomhamsters.cards.definitions.HyperModeCardDefinition
 import com.doomhamsters.cards.definitions.PowerNapCardDefinition
@@ -25,6 +26,7 @@ object CardRegistry {
         SnackStashCardDefinition,
         PowerNapCardDefinition,
         QuickPeekCardDefinition,
+        FourHamstersCardDefinition,
         SignOfFateCardDefinition,
         HyperModeCardDefinition,
         SniffAheadCardDefinition,

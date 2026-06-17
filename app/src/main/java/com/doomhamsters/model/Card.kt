@@ -15,6 +15,7 @@ enum class CardType {
     TunnelChaos,
     SignOfFate,
     SniffAhead,
+    FourHamsters,
     StealCard,
     Normal;
 
@@ -31,6 +32,7 @@ enum class CardType {
             "TUNNEL_CHAOS", "TUNNELCHAOS" -> TunnelChaos
             "STEAL_CARD", "STEALCARD" -> StealCard
             "HYPER_MODE", "HYPERMODE" -> HyperMode
+            "HAMSTER_FOUR", "HAMSTER4" -> FourHamsters
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)
         }

@@ -14,8 +14,8 @@ class StealCardDefinitionTest {
     @Test
     fun `verify StealCardDefinition properties`() {
         assertEquals(CardType.StealCard, StealCardDefinition.type)
-        assertEquals("Kartenklau", StealCardDefinition.displayName)
-        assertEquals("Klaut einem Mitspieler deiner Wahl eine zufällige Handkarte.", StealCardDefinition.description)
+        assertEquals("Tiny Thief", StealCardDefinition.displayName)
+        assertEquals("Steals a random card from a player of your choice.", StealCardDefinition.description)
 
         val command = StealCardDefinition.command
         assertEquals(CardCommandId.STEAL_CARD, command.id)
@@ -40,7 +40,7 @@ class StealCardDefinitionTest {
 
         val outcome = StealCardDefinition.command.executor?.execute(context)
         verify(exactly = 1) { mockEngine.discardFromHand(mockPlayer, mockCard) }
-        assertEquals("Christian aktiviert Kartenklau.", outcome?.publicMessage)
+        assertEquals("Christian aktiviert Tiny Thief.", outcome?.publicMessage)
         assertEquals(false, outcome?.endsTurn)
     }
 }

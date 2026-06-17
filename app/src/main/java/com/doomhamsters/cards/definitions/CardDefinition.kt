@@ -17,9 +17,9 @@ data class CardCommandDefinition(
     val id: CardCommandId,
     val actionPath: String = "card/activate",
     val endsTurn: Boolean = false,
-    val privateResult: Boolean = false,
     val requiresTargetPlayer: Boolean = false,
     val requiresCardType: Boolean = false,
+    val privateResult: Boolean = false,
     val requiresHamsterType: Boolean = false,
     val executor: CardCommand? = null
 )

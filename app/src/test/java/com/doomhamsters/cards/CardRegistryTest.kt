@@ -1,6 +1,7 @@
 package com.doomhamsters.cards
 
 
+import com.doomhamsters.cards.definitions.StealCardDefinition
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -29,10 +30,29 @@ class CardRegistryTest {
     }
 
     @Test
+    fun `sniff ahead is registered as private result command card`() {
+        val definition = CardRegistry.definitionForType(CardType.SniffAhead)
+
+        assertEquals("Sniff Ahead", definition.displayName)
+        assertEquals(CardCommandId.SNIFF_AHEAD, definition.command?.id)
+        assertTrue(definition.command?.privateResult == true)
+        assertFalse(definition.command?.endsTurn == true)
+    }
+
+    @Test
     fun `normal card remains non activatable`() {
         val definition = CardRegistry.definitionFor(Card(CardType.Normal))
 
         assertFalse(definition.command != null)
         assertEquals("Normal", definition.displayName)
+    }
+    @Test
+    fun `StealCardDefinition should have correct properties`() {
+        val definition = StealCardDefinition
+
+        assertEquals("Tiny Thief", definition.displayName)
+        assertEquals(CardCommandId.STEAL_CARD, definition.command.id)
+        assertTrue(definition.command.privateResult)
+        assertFalse(definition.command.endsTurn)
     }
 }

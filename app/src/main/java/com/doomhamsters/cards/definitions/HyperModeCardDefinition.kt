@@ -9,7 +9,7 @@ import com.doomhamsters.model.CardType
 /** Defines the Hyper Mode card and its extra turn behavior. */
 object HyperModeCardDefinition : CardDefinition {
 
-    override val type: CardType = CardType.SignOfFate
+    override val type: CardType = CardType.HyperMode
 
     override val displayName: String = "Hyper Mode"
 

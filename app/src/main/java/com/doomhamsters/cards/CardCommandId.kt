@@ -5,8 +5,9 @@ package com.doomhamsters.cards
 enum class CardCommandId {
     POWER_NAP,
     SIGN_OF_FATE,
-    BEG_FOR_SNACKS,
-    QUICK_PEEK;
+    QUICK_PEEK,
+    SNIFF_AHEAD,
+    BEG_FOR_SNACKS;
 
     companion object {
         /** Maps backend wire values to a known card command identifier. */

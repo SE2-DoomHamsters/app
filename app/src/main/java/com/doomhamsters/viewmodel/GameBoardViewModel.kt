@@ -151,7 +151,7 @@ open class GameBoardViewModel(
         onStateChanged = { broadcastLatestState() }
     )
 
-    val pendingTargetedCard: StateFlow<Card?> = cardActivation.pendingTargetedCard
+
 
     private val _pendingTargetedCard = MutableStateFlow<Card?>(null)
     val pendingTargetedCard: StateFlow<Card?> = _pendingTargetedCard

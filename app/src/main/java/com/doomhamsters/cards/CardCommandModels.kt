@@ -11,7 +11,7 @@ data class CardCommandRequest(
     val cardId: String?,
     val cardType: CardType,
     val commandId: CardCommandId,
-    val parameters: JSONObject = JSONObject()
+    val parameters: Map<String, String> = emptyMap()
 ) {
     /** Serializes this command request into the backend JSON format. */
     fun toJson(): JSONObject = JSONObject().apply {
@@ -19,10 +19,13 @@ data class CardCommandRequest(
         cardId?.let { put("cardId", it) }
         put("cardType", cardType.name)
         put("commandId", commandId.name)
-        put("parameters", parameters)
+        if (parameters.isNotEmpty()) {
+            val paramsJson = JSONObject()
+            parameters.forEach { (k, v) -> paramsJson.put(k, v) }
+            put("parameters", paramsJson)
+        }
     }
 }
-
 /** Enumerates the card-command event types emitted by the backend. */
 enum class CardCommandEventType {
     CARD_COMMAND_PLAYED,

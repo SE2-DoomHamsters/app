@@ -39,6 +39,17 @@ class CardRegistryTest {
     }
 
     @Test
+    fun `tunnel chaos is registered as a playable command card`() {
+        val definition = CardRegistry.definitionForType(CardType.TunnelChaos)
+
+        assertEquals("Tunnel Chaos", definition.displayName)
+        assertEquals(CardCommandId.TUNNEL_CHAOS, definition.command?.id)
+        assertTrue(definition.command != null)
+        assertFalse(definition.command?.endsTurn == true)
+        assertTrue(definition.command?.executor == null)
+    }
+
+    @Test
     fun `normal card remains non activatable`() {
         val definition = CardRegistry.definitionFor(Card(CardType.Normal))
 

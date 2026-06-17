@@ -14,6 +14,7 @@ enum class CardType {
     QuickPeek,
     SignOfFate,
     SniffAhead,
+    StealCard,
     Normal;
 
     companion object {
@@ -25,6 +26,8 @@ enum class CardType {
             "QUICK_PEEK", "QUICKPEEK" -> QuickPeek
             "SIGN_OF_FATE", "SIGNOFFATE" -> SignOfFate
             "SNIFF_AHEAD", "SNIFFAHEAD" -> SniffAhead
+            "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
+            "STEAL_CARD", "STEALCARD" -> StealCard
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "HYPER_MODE", "HYPERMODE" -> HyperMode
             "NORMAL" -> Normal

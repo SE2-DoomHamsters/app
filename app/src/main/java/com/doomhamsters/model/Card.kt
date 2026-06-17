@@ -11,6 +11,7 @@ enum class CardType {
     PowerNap,
     BegForSnacks,
     QuickPeek,
+    SniffAhead,
     StealCard,
     Normal;
 
@@ -21,6 +22,7 @@ enum class CardType {
             "SNACK_STASH", "SNACKSTASH" -> SnackStash
             "POWER_NAP", "POWERNAP" -> PowerNap
             "QUICK_PEEK", "QUICKPEEK" -> QuickPeek
+            "SNIFF_AHEAD", "SNIFFAHEAD" -> SniffAhead
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "STEAL_CARD", "STEALCARD" -> StealCard
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks

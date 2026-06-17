@@ -17,7 +17,7 @@ class FourHamstersCardDefinitionTest {
     fun `definition should have correct metadata`() {
         val definition = FourHamstersCardDefinition
 
-        assertEquals(CardType.Normal, definition.type)
+        assertEquals(CardType.FourHamsters, definition.type)
         assertEquals("Hamster Combo: 4-of-a-Kind", definition.displayName)
 
         // Prüfen, ob die richtigen Flags für die UI gesetzt sind

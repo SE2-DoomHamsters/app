@@ -8,7 +8,7 @@ import com.doomhamsters.model.CardType
 
 /** Defines the Four Hamsters combo behavior for stealing a life. */
 object FourHamstersCardDefinition : CardDefinition {
-    override val type: CardType = CardType.Normal
+    override val type: CardType = CardType.FourHamsters
     override val displayName: String = "Hamster Combo: 4-of-a-Kind"
     override val description: String =
         "Play 4 identical Hamster cards to steal 1 life from a target player."

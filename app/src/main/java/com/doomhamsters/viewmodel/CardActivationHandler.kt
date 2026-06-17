@@ -64,7 +64,8 @@ class CardActivationHandler(
             Log.d(tag, "Activate ignored gameId=$gameId cardId=${card.id} cardType=${card.type}")
             return
         }
-        if (command.requiresTargetPlayer || command.requiresCardType) {
+
+        if (command.requiresTargetPlayer || command.requiresCardType || command.requiresHamsterType) {
             _pendingTargetedCard.value = card
             return
         }

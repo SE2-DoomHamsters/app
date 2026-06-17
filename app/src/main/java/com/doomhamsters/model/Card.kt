@@ -12,6 +12,7 @@ enum class CardType {
     BegForSnacks,
     QuickPeek,
     SignOfFate,
+    HyperMode,
     Normal;
 
     companion object {

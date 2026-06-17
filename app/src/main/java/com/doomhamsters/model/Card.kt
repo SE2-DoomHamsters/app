@@ -9,7 +9,11 @@ enum class CardType {
     Doom,
     SnackStash,
     PowerNap,
+    BegForSnacks,
+    HyperMode,
     QuickPeek,
+    SignOfFate,
+    SniffAhead,
     CageSwap,
     Normal;
 
@@ -21,6 +25,10 @@ enum class CardType {
             "POWER_NAP", "POWERNAP" -> PowerNap
             "QUICK_PEEK", "QUICKPEEK" -> QuickPeek
             "CAGE_SWAP", "CAGESWAP" -> CageSwap
+            "SIGN_OF_FATE", "SIGNOFFATE" -> SignOfFate
+            "SNIFF_AHEAD", "SNIFFAHEAD" -> SniffAhead
+            "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
+            "HYPER_MODE", "HYPERMODE" -> HyperMode
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)
         }

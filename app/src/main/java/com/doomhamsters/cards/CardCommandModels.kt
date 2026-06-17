@@ -11,7 +11,7 @@ data class CardCommandRequest(
     val cardId: String?,
     val cardType: CardType,
     val commandId: CardCommandId,
-    val parameters: JSONObject = JSONObject()
+    val parameters: Map<String, String> = emptyMap()
 ) {
     /** Serializes this command request into the backend JSON format. */
     fun toJson(): JSONObject = JSONObject().apply {
@@ -19,10 +19,13 @@ data class CardCommandRequest(
         cardId?.let { put("cardId", it) }
         put("cardType", cardType.name)
         put("commandId", commandId.name)
-        put("parameters", parameters)
+        if (parameters.isNotEmpty()) {
+            val paramsJson = JSONObject()
+            parameters.forEach { (k, v) -> paramsJson.put(k, v) }
+            put("parameters", paramsJson)
+        }
     }
 }
-
 /** Enumerates the card-command event types emitted by the backend. */
 enum class CardCommandEventType {
     CARD_COMMAND_PLAYED,
@@ -37,7 +40,8 @@ data class CardCommandEvent(
     val playerName: String?,
     val message: String?,
     val card: Card?,
-    val revealedCard: Card?
+    val revealedCard: Card?,
+    val revealedCards: List<Card> = emptyList()
 ) {
     companion object {
         /** Parses a backend JSON payload into a card-command event when possible. */
@@ -45,6 +49,15 @@ data class CardCommandEvent(
             val type = runCatching {
                 CardCommandEventType.valueOf(json.optString("type").trim().uppercase())
             }.getOrNull() ?: return null
+
+            val revealedCardsArray = json.optJSONArray("revealedCards")
+            val revealedCards = buildList {
+                if (revealedCardsArray != null) {
+                    for (i in 0 until revealedCardsArray.length()) {
+                        revealedCardsArray.optJSONObject(i)?.let { add(Card.fromJson(it)) }
+                    }
+                }
+            }
 
             return CardCommandEvent(
                 type = type,
@@ -57,7 +70,8 @@ data class CardCommandEvent(
                 playerName = json.optNullableString("playerName"),
                 message = json.optNullableString("message"),
                 card = json.optJSONObject("card")?.let(Card::fromJson),
-                revealedCard = json.optJSONObject("revealedCard")?.let(Card::fromJson)
+                revealedCard = json.optJSONObject("revealedCard")?.let(Card::fromJson),
+                revealedCards = revealedCards
             )
         }
 
@@ -70,5 +84,6 @@ data class CardCommandEvent(
 data class CardCommandNotice(
     val title: String,
     val message: String,
-    val revealedCard: Card? = null
+    val revealedCard: Card? = null,
+    val revealedCards: List<Card> = emptyList()
 )

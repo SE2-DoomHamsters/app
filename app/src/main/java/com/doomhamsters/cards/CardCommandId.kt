@@ -7,9 +7,11 @@ enum class CardCommandId {
     SIGN_OF_FATE,
     HYPER_MODE,
     BEG_FOR_SNACKS,
-    SNIFF_AHED,
-    CAGE_SWAP,
-    QUICK_PEEK;
+    QUICK_PEEK,
+    SNIFF_AHEAD,
+    STEAL_CARD,
+    CAGE_SWAP;
+
 
     companion object {
         /** Maps backend wire values to a known card command identifier. */

@@ -1,6 +1,7 @@
 package com.doomhamsters.cards
 
 
+import com.doomhamsters.cards.definitions.StealCardDefinition
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -44,5 +45,14 @@ class CardRegistryTest {
 
         assertFalse(definition.command != null)
         assertEquals("Normal", definition.displayName)
+    }
+    @Test
+    fun `StealCardDefinition should have correct properties`() {
+        val definition = StealCardDefinition
+
+        assertEquals("Tiny Thief", definition.displayName)
+        assertEquals(CardCommandId.STEAL_CARD, definition.command.id)
+        assertTrue(definition.command.privateResult)
+        assertFalse(definition.command.endsTurn)
     }
 }

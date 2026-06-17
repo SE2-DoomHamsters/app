@@ -5,6 +5,7 @@ package com.doomhamsters.cards
 enum class CardCommandId {
     POWER_NAP,
     SIGN_OF_FATE,
+    BEG_FOR_SNACKS,
     QUICK_PEEK;
 
     companion object {

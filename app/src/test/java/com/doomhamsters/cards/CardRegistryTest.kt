@@ -66,4 +66,13 @@ class CardRegistryTest {
         assertTrue(definition.command.privateResult)
         assertFalse(definition.command.endsTurn)
     }
+    @Test
+    fun `cage swap is registered as targetless command card`() {
+        val definition = CardRegistry.definitionForType(CardType.CageSwap)
+
+        assertEquals("Cage Swap", definition.displayName)
+        assertEquals(CardCommandId.CAGE_SWAP, definition.command?.id)
+        assertFalse(definition.command?.privateResult == true)
+        assertFalse(definition.command?.endsTurn == true)
+    }
 }

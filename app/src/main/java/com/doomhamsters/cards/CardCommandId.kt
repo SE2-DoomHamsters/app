@@ -10,8 +10,9 @@ enum class CardCommandId {
     BEG_FOR_SNACKS,
     QUICK_PEEK,
     SNIFF_AHEAD,
-    STEAL_CARD,
-    CAGE_SWAP;
+    CAGE_SWAP,
+    TUNNEL_CHAOS,
+    STEAL_CARD;
 
 
     companion object {

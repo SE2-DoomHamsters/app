@@ -10,6 +10,7 @@ enum class CardType {
     SnackStash,
     PowerNap,
     BegForSnacks,
+    HyperMode,
     QuickPeek,
     SniffAhead,
     StealCard,
@@ -26,6 +27,7 @@ enum class CardType {
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "STEAL_CARD", "STEALCARD" -> StealCard
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
+            "HYPER_MODE", "HYPERMODE" -> HyperMode
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)
         }

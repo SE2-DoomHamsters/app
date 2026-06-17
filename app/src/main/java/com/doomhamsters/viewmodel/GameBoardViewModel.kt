@@ -93,6 +93,11 @@ open class GameBoardViewModel(
 
     private val _cardCommandNotice = MutableStateFlow<CardCommandNotice?>(null)
     val cardCommandNotice: StateFlow<CardCommandNotice?> = _cardCommandNotice
+    private val _showTargetSelectionDialog = MutableStateFlow(false)
+    val showTargetSelectionDialog: StateFlow<Boolean> = _showTargetSelectionDialog
+    private val _selectedCardForActivation = MutableStateFlow<Card?>(null)
+    val selectedCardForActivation: StateFlow<Card?> = _selectedCardForActivation
+    private val _isActivatingCard = MutableStateFlow(false)
 
     val uiState: StateFlow<GameBoardUiState> = combine(
         _gameState,
@@ -125,11 +130,6 @@ open class GameBoardViewModel(
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = GameBoardUiState()
     )
-    private val _showTargetSelectionDialog = MutableStateFlow(false)
-    val showTargetSelectionDialog: StateFlow<Boolean> = _showTargetSelectionDialog
-    private val _selectedCardForActivation = MutableStateFlow<Card?>(null)
-    val selectedCardForActivation: StateFlow<Card?> = _selectedCardForActivation
-    private val _isActivatingCard = MutableStateFlow(false)
     private var awaitingLocalDrawOutcome = false
     private var doomOutcomeLogged = false
     private var pendingPrivateDoomCard: Card? = null
@@ -633,7 +633,7 @@ open class GameBoardViewModel(
     fun canActivateCard(card: Card): Boolean = cardActivation.canActivate(card)
 
     /** Sends the activation request for a playable card. */
-    fun activateCard(card: Card) = cardActivation.activate(card)
+    //fun activateCard(card: Card) = cardActivation.activate(card)
 
     /** Called by the UI once the player has chosen a target and card type. */
     fun activateCardWithTargets(

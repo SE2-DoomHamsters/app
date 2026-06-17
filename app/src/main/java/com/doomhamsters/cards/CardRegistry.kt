@@ -23,6 +23,7 @@ object CardRegistry {
         QuickPeekCardDefinition,
         BegForSnacksCardDefinition,
         StealCardDefinition,
+        BegForSnacksCardDefinition,
         NormalCardDefinition
     )
 

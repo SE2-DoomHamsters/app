@@ -26,6 +26,7 @@ fun GameBoard(
     onGameOver: (String) -> Unit,
     onLeaveGame: () -> Unit = {}
 ) {
+    val showTargetSelectionDialog by viewModel.showTargetSelectionDialog.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val gameState = uiState.gameState
     val isLocalPlayersTurn = uiState.isLocalPlayersTurn
@@ -39,7 +40,6 @@ fun GameBoard(
     val cardCommandNotice = uiState.cardCommandNotice
     val connectionStatus = uiState.connectionStatus
     val screenState = rememberGameBoardState()
-    val showTargetSelectionDialog by viewModel.showTargetSelectionDialog.collectAsState()
 
     LaunchedEffect(viewModel) {
         launch {

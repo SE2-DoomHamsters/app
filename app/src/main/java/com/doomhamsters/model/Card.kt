@@ -23,6 +23,7 @@ enum class CardType {
             "QUICK_PEEK", "QUICKPEEK" -> QuickPeek
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "STEAL_CARD", "STEALCARD" -> StealCard
+            "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)
         }

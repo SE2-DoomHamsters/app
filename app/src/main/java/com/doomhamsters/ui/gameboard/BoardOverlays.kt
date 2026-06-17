@@ -1,12 +1,12 @@
 package com.doomhamsters.ui.gameboard
 import androidx.compose.runtime.Composable
 import com.doomhamsters.cards.CardCommandNotice
-//import com.doomhamsters.cheating.presentation.SnackStashNoticeKind
-//import com.doomhamsters.cheating.presentation.SnackStashNoticeState
+import com.doomhamsters.cheating.presentation.SnackStashNoticeKind
+import com.doomhamsters.cheating.presentation.SnackStashNoticeState
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.Player
-//import com.doomhamsters.ui.cheating.SnackStashClaimPromptOverlay
-//import com.doomhamsters.ui.cheating.SnackStashNoticeOverlay
+import com.doomhamsters.ui.cheating.SnackStashClaimPromptOverlay
+import com.doomhamsters.ui.cheating.SnackStashNoticeOverlay
 internal data class BoardOverlayState(
     val pendingDoom: Card?,
     val pendingDoomMessage: String?,
@@ -17,7 +17,7 @@ internal data class BoardOverlayState(
     val pausedForDoomMessage: String?,
     val pausedForDoomDetail: String?,
     val cardCommandNotice: CardCommandNotice?,
-    //val snackStashNoticeState: SnackStashNoticeState
+    val snackStashNoticeState: SnackStashNoticeState
 )
 
 internal data class BoardOverlayContext(
@@ -43,13 +43,13 @@ internal fun BoardOverlays(
     context: BoardOverlayContext,
     callbacks: BoardOverlayCallbacks
 ) {
-    //if (overlayState.snackStashNoticeState.kind != SnackStashNoticeKind.NONE) {
-        //SnackStashNoticeOverlay(
-          //  state = overlayState.snackStashNoticeState,
-           // onVote = callbacks.onSnackStashVote,
-           // onResolutionDismiss = callbacks.onSnackStashResolutionDismiss
-       // )
-  //  } else {
+    if (overlayState.snackStashNoticeState.kind != SnackStashNoticeKind.NONE) {
+        SnackStashNoticeOverlay(
+            state = overlayState.snackStashNoticeState,
+            onVote = callbacks.onSnackStashVote,
+            onResolutionDismiss = callbacks.onSnackStashResolutionDismiss
+        )
+    } else {
         when {
             overlayState.pendingDoom != null && overlayState.pendingDoomRequiresInsertionUi -> {
                 DoomOverlay(
@@ -68,14 +68,14 @@ internal fun BoardOverlays(
                 )
             }
 
-            //overlayState.pendingDoom != null && overlayState.pendingDoomRequiresSelection -> {
-                //SnackStashClaimPromptOverlay(
-                    //pendingDoom = overlayState.pendingDoom,
-                   // message = overlayState.pendingDoomMessage
-                    //    ?: "Use Snack Stash, bluff with another card, or accept Doom.",
-                   // onAcceptDoom = callbacks.onAcceptDoom
-               // )
-           // }
+            overlayState.pendingDoom != null && overlayState.pendingDoomRequiresSelection -> {
+                SnackStashClaimPromptOverlay(
+                    pendingDoom = overlayState.pendingDoom,
+                    message = overlayState.pendingDoomMessage
+                        ?: "Use Snack Stash, bluff with another card, or accept Doom.",
+                    onAcceptDoom = callbacks.onAcceptDoom
+                )
+            }
 
             overlayState.pendingDoom != null && overlayState.pendingDoomMessage != null -> {
                 DoomResolvedOverlay(
@@ -98,7 +98,7 @@ internal fun BoardOverlays(
                 )
             }
         }
-    //}
+    }
 
     overlayState.cardCommandNotice?.let { notice ->
         CardCommandNoticeOverlay(

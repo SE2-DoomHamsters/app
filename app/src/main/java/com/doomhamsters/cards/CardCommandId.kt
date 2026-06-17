@@ -6,6 +6,7 @@ enum class CardCommandId {
     POWER_NAP,
     BEG_FOR_SNACKS,
     QUICK_PEEK,
+    SNIFF_AHEAD,
     TUNNEL_CHAOS;
 
     companion object {

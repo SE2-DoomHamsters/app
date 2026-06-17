@@ -12,6 +12,7 @@ enum class CardType {
     BegForSnacks,
     QuickPeek,
     TunnelChaos,
+    SniffAhead,
     Normal;
 
     companion object {
@@ -21,6 +22,7 @@ enum class CardType {
             "SNACK_STASH", "SNACKSTASH" -> SnackStash
             "POWER_NAP", "POWERNAP" -> PowerNap
             "QUICK_PEEK", "QUICKPEEK" -> QuickPeek
+            "SNIFF_AHEAD", "SNIFFAHEAD" -> SniffAhead
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "TUNNEL_CHAOS", "TUNNELCHAOS" -> TunnelChaos
             "NORMAL" -> Normal

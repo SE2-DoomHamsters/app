@@ -300,6 +300,19 @@ open class GameBoardViewModel(
                             revealedCard = parsedEvent.revealedCard
                         )
                     }
+                    CardCommandId.SNIFF_AHEAD -> {
+                        val title = parsedEvent.card?.displayName() ?: "Sniff Ahead"
+                        val message = parsedEvent.message
+                            ?: if (parsedEvent.revealedCards.isEmpty()) "The deck is empty."
+                            else "Top ${parsedEvent.revealedCards.size} card(s): ${
+                                parsedEvent.revealedCards.joinToString(", ") { it.displayName() }
+                            }."
+                        _cardCommandNotice.value = CardCommandNotice(
+                            title = title,
+                            message = message,
+                            revealedCards = parsedEvent.revealedCards
+                        )
+                    }
                     else -> Unit
                 }
             }

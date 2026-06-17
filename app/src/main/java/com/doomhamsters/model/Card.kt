@@ -11,8 +11,8 @@ enum class CardType {
     PowerNap,
     BegForSnacks,
     QuickPeek,
-    SniffAhead,
     TunnelChaos,
+    SniffAhead,
     Normal;
 
     companion object {

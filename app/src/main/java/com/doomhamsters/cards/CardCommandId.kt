@@ -8,6 +8,8 @@ enum class CardCommandId {
     QUICK_PEEK,
     SNIFF_AHEAD,
     TUNNEL_CHAOS;
+    HYPER_MODE,
+  
 
     companion object {
         /** Maps backend wire values to a known card command identifier. */

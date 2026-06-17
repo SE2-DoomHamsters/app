@@ -11,8 +11,6 @@ enum class CardCommandId {
     QUICK_PEEK,
     SNIFF_AHEAD,
     TUNNEL_CHAOS,
-    HYPER_MODE,
-    SIGN_OF_FATE,
     STEAL_CARD;
 
 

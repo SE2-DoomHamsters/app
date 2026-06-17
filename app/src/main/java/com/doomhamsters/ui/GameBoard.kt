@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -25,6 +26,7 @@ fun GameBoard(
     onGameOver: (String) -> Unit,
     onLeaveGame: () -> Unit = {}
 ) {
+    val showTargetSelectionDialog by viewModel.showTargetSelectionDialog.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val gameState = uiState.gameState
     val isLocalPlayersTurn = uiState.isLocalPlayersTurn
@@ -265,7 +267,33 @@ fun GameBoard(
                         onSnackStashResolutionDismiss = {}
                     )
                 )
+                if (showTargetSelectionDialog) {
+                    val opponents = state.players.filter { it.id != viewModel.localPlayerId }
 
+                    androidx.compose.material3.AlertDialog(
+                        onDismissRequest = { viewModel.dismissTargetSelection() },
+                        title = { Text("Ziel auswählen", fontWeight = FontWeight.Bold) },
+                        text = {
+                            Column {
+                                Text("Von wem möchtest du eine Karte klauen?")
+                                Spacer(modifier = Modifier.height(16.dp))
+                                opponents.forEach { opponent ->
+                                    androidx.compose.material3.Button(
+                                        onClick = { viewModel.selectStealTarget(opponent.id) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(opponent.name)
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            androidx.compose.material3.TextButton(onClick = { viewModel.dismissTargetSelection() }) {
+                                Text("Abbrechen")
+                            }
+                        }
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

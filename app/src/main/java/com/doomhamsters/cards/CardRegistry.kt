@@ -10,7 +10,9 @@ import com.doomhamsters.cards.definitions.NormalCardDefinition
 import com.doomhamsters.cards.definitions.HyperModeCardDefinition
 import com.doomhamsters.cards.definitions.PowerNapCardDefinition
 import com.doomhamsters.cards.definitions.QuickPeekCardDefinition
+import com.doomhamsters.cards.definitions.SignOfFateCardDefinition
 import com.doomhamsters.cards.definitions.SnackStashCardDefinition
+import com.doomhamsters.cards.definitions.StealCardDefinition
 import com.doomhamsters.cards.definitions.SniffAheadCardDefinition
 import com.doomhamsters.cards.definitions.BegForSnacksCardDefinition
 import com.doomhamsters.model.Card
@@ -24,8 +26,11 @@ object CardRegistry {
         PowerNapCardDefinition,
         QuickPeekCardDefinition,
         FourHamstersCardDefinition,
+        SignOfFateCardDefinition,
         HyperModeCardDefinition,
         SniffAheadCardDefinition,
+        BegForSnacksCardDefinition,
+        StealCardDefinition,
         BegForSnacksCardDefinition,
         NormalCardDefinition
     )

@@ -2,6 +2,7 @@ package com.doomhamsters.cards
 import com.doomhamsters.cards.definitions.CageSwapCardDefinition
 import com.doomhamsters.model.CardType
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 class CageSwapCardDefinitionTest {
     @Test
@@ -15,5 +16,7 @@ class CageSwapCardDefinitionTest {
     fun `verify CageSwap command definition sends correct targetless command`() {
         val command = CageSwapCardDefinition.command
         assertEquals(CardCommandId.CAGE_SWAP, command.id)
+        assertFalse(command.privateResult)
+        assertFalse(command.endsTurn)
     }
 }

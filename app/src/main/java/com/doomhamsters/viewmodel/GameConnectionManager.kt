@@ -30,6 +30,7 @@ class GameConnectionManager(private val gameId: String,
                                                onGameStateReceived: suspend (com.doomhamsters.model.GameState) -> Unit,
                                                onPublicEventReceived: suspend (org.json.JSONObject) -> Unit,
                                                onPrivateEventReceived: suspend (org.json.JSONObject) -> Unit,
+                                               onServerError: suspend (String) -> Unit,
                                                onFatalError: suspend (String) -> Unit,
                                                onLog: (String) -> Unit) {
         var attempt = 0
@@ -80,6 +81,10 @@ class GameConnectionManager(private val gameId: String,
                                 onPrivateEventReceived(event)
                             }
                     }
+                    launch {
+                        repository.subscribeToErrors(gameId, localPlayerId)
+                            .collect { message -> onServerError(message) }
+                    }
                 }
                 Log.w(tag, "Subscriptions completed attempt=$attempt/$maxReconnectAttempts gameId=$gameId")
                 _connectionStatus.value = ConnectionStatus.Disconnected
@@ -105,6 +110,7 @@ class GameConnectionManager(private val gameId: String,
         onGameStateReceived: suspend (com.doomhamsters.model.GameState) -> Unit,
         onPublicEventReceived: suspend (org.json.JSONObject) -> Unit,
         onPrivateEventReceived: suspend (org.json.JSONObject) -> Unit,
+        onServerError: suspend (String) -> Unit,
         onFatalError: suspend (String) -> Unit,
         onLog: (String) -> Unit
     ) {
@@ -129,6 +135,7 @@ class GameConnectionManager(private val gameId: String,
             onGameStateReceived = onGameStateReceived,
             onPublicEventReceived = onPublicEventReceived,
             onPrivateEventReceived = onPrivateEventReceived,
+            onServerError = onServerError,
             onFatalError = onFatalError,
             onLog = onLog
         )}

@@ -31,7 +31,6 @@ enum class CardType {
             "SNIFF_AHEAD", "SNIFFAHEAD" -> SniffAhead
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "STEAL_CARD", "STEALCARD" -> StealCard
-            "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "HYPER_MODE", "HYPERMODE" -> HyperMode
             "HAMSTER_FOUR", "HAMSTER4" -> FourHamsters
             "NORMAL" -> Normal

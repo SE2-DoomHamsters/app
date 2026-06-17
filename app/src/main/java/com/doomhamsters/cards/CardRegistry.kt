@@ -33,7 +33,6 @@ object CardRegistry {
         SniffAheadCardDefinition,
         BegForSnacksCardDefinition,
         StealCardDefinition,
-        BegForSnacksCardDefinition,
         NormalCardDefinition
     )
 

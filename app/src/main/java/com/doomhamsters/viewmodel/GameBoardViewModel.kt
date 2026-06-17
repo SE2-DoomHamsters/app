@@ -225,6 +225,16 @@ open class GameBoardViewModel(
                         )
                     }
 
+                    CardCommandId.TWO_HAMSTERS -> {
+                        val title = parsedEvent.card?.displayName() ?: "Hamster Combo: 2-of-a-Kind"
+                        val stolenCardName = parsedEvent.revealedCard?.displayName() ?: "a card"
+                        _cardCommandNotice.value = CardCommandNotice(
+                            title = title,
+                            message = parsedEvent.message ?: "You stole $stolenCardName!",
+                            revealedCard = parsedEvent.revealedCard
+                        )
+                    }
+
                     CardCommandId.SNIFF_AHEAD -> {
                         val title = parsedEvent.card?.displayName() ?: "Sniff Ahead"
                         val message = parsedEvent.message

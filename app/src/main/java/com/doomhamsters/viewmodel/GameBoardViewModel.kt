@@ -257,6 +257,16 @@ open class GameBoardViewModel(
                             revealedCard = parsedEvent.revealedCard
                         )
                     }
+                    CardCommandId.STEAL_CARD -> {
+                        val title = parsedEvent.card?.displayName() ?: "Tiny Thief"
+                        val stolenCardName = parsedEvent.revealedCard?.displayName() ?: "a card"
+
+                        _cardCommandNotice.value = CardCommandNotice(
+                            title = title,
+                            message = "You stole $stolenCardName!",
+                            revealedCard = parsedEvent.revealedCard
+                        )
+                    }
                     else -> Unit
                 }
             }

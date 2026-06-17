@@ -9,8 +9,8 @@ import com.doomhamsters.model.CardType
     /** Defines the Steal Card and its player-targeting activation behavior. */
     object StealCardDefinition : CardDefinition {
         override val type: CardType = CardType.StealCard
-        override val displayName: String = "Kartenklau"
-        override val description: String = "Klaut einem Mitspieler deiner Wahl eine zufällige Handkarte."
+        override val displayName: String = "Tiny Thief"
+        override val description: String = "Steals a random card from a player of your choice."
 
         override val command: CardCommandDefinition = CardCommandDefinition(
             id = CardCommandId.STEAL_CARD,

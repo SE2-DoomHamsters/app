@@ -22,8 +22,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
@@ -100,7 +98,7 @@ open class GameBoardViewModel(
         _pausedForDoomMessage,
         _pausedForDoomDetail,
         _cardCommandNotice,
-        _connectionStatus
+        connectionManager.connectionStatus
     ) { flows ->
         GameBoardUiState(
             gameState = flows[0] as GameState?,

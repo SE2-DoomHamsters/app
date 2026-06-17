@@ -162,7 +162,6 @@ class GameConnectionManager(private val gameId: String,
 
         val finalError = lastError ?: IllegalStateException("Unknown connection error")
         Log.e(tag, "Connection error gameId=$gameId", finalError)
-        //_error.emit("Connection error: ${finalError.message}")
         onFatalError("Connection error: ${finalError.message}")
         return false
     }

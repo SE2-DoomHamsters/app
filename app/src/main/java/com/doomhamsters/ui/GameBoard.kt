@@ -8,6 +8,10 @@ import com.doomhamsters.cheating.presentation.SnackStashNoticeOverlayPresentatio
 import com.doomhamsters.ui.theme.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,10 +60,14 @@ fun GameBoard(
     fun clearSnackStashHandSelection() {
         applySnackStashHandSelection(SnackStashClaimConfirmationDialogPresentation.clearedHandSelection())
     }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(viewModel) {
         launch {
-            viewModel.error.collect { screenState.latestError = it }
+            viewModel.error.collect { message ->
+                screenState.latestError = message
+                snackbarHostState.showSnackbar(message)
+            }
         }
         launch {
             viewModel.gameOver.collect(onGameOver)
@@ -344,6 +352,13 @@ fun GameBoard(
                 ) {
                     PlayerArea(content = localPlayerAreaContent)
                 }
+
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .zIndex(10f)
+                )
             }
         }
     }

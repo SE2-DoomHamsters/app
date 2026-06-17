@@ -15,7 +15,7 @@ class TwoHamstersCardDefinitionTest {
 
     @Test
     fun `definition should require correct UI flags and metadata`() {
-        assertEquals(CardType.Normal, TwoHamstersCardDefinition.type)
+        assertEquals(CardType.TwoHamsters, TwoHamstersCardDefinition.type)
         assertEquals("Hamster Combo: 2-of-a-Kind", TwoHamstersCardDefinition.displayName)
         assertTrue(TwoHamstersCardDefinition.description.contains("Play 2 identical Hamster cards"))
 

@@ -8,7 +8,7 @@ import com.doomhamsters.model.CardType
 
 /** Defines the Two Hamsters combo behavior for stealing a random card. */
 object TwoHamstersCardDefinition : CardDefinition {
-    override val type: CardType = CardType.Normal
+    override val type: CardType = CardType.TwoHamsters
     override val displayName: String = "Hamster Combo: 2-of-a-Kind"
     override val description: String =
         "Play 2 identical Hamster cards to steal a random card from a target player."

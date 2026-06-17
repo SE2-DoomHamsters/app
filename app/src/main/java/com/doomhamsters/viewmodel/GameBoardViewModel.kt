@@ -158,6 +158,7 @@ open class GameBoardViewModel(
                     runCatching { handlePrivateEvent(event) }
                 },
                 onFatalError = { errorMsg -> _error.emit(errorMsg) },
+                onServerError = { message -> handleServerError(message) },
                 onLog = { msg -> addLog(msg) }
             )
         }
@@ -180,6 +181,11 @@ open class GameBoardViewModel(
         addLog(message)
     }
 
+
+    private suspend fun handleServerError(message: String) {
+        addLog("Error: $message")
+        _error.emit(message)
+    }
 
     private fun handlePrivateEvent(event: JSONObject) {
         when (event.optString("type").trim().uppercase()) {

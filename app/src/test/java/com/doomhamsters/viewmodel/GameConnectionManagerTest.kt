@@ -80,6 +80,7 @@ class GameConnectionManagerTest {
                     onGameStateReceived = {},
                     onPublicEventReceived = {},
                     onPrivateEventReceived = {},
+                    onServerError = {},
                     onFatalError = {},
                     onLog = {}
                 )
@@ -160,6 +161,7 @@ class GameConnectionManagerTest {
                 onGameStateReceived = {},
                 onPublicEventReceived = {},
                 onPrivateEventReceived = {},
+                onServerError = {},
                 onFatalError = {},
                 onLog = {}
             )
@@ -258,6 +260,7 @@ class GameConnectionManagerTest {
                 onGameStateReceived = {},
                 onPublicEventReceived = {},
                 onPrivateEventReceived = {},
+                onServerError = {},
                 onFatalError = {},
                 onLog = {}
             )

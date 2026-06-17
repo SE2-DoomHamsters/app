@@ -40,6 +40,17 @@ class CardRegistryTest {
     }
 
     @Test
+    fun `tunnel chaos is registered as a playable command card`() {
+        val definition = CardRegistry.definitionForType(CardType.TunnelChaos)
+
+        assertEquals("Tunnel Chaos", definition.displayName)
+        assertEquals(CardCommandId.TUNNEL_CHAOS, definition.command?.id)
+        assertTrue(definition.command != null)
+        assertFalse(definition.command?.endsTurn == true)
+        assertTrue(definition.command?.executor == null)
+    }
+
+    @Test
     fun `normal card remains non activatable`() {
         val definition = CardRegistry.definitionFor(Card(CardType.Normal))
 
@@ -54,5 +65,14 @@ class CardRegistryTest {
         assertEquals(CardCommandId.STEAL_CARD, definition.command.id)
         assertTrue(definition.command.privateResult)
         assertFalse(definition.command.endsTurn)
+    }
+    @Test
+    fun `cage swap is registered as targetless command card`() {
+        val definition = CardRegistry.definitionForType(CardType.CageSwap)
+
+        assertEquals("Cage Swap", definition.displayName)
+        assertEquals(CardCommandId.CAGE_SWAP, definition.command?.id)
+        assertFalse(definition.command?.privateResult == true)
+        assertFalse(definition.command?.endsTurn == true)
     }
 }

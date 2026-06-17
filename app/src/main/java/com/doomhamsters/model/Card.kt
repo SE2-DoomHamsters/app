@@ -12,8 +12,10 @@ enum class CardType {
     BegForSnacks,
     HyperMode,
     QuickPeek,
+    TunnelChaos,
     SignOfFate,
     SniffAhead,
+    CageSwap,
     FourHamsters,
     StealCard,
     TwoHamsters,
@@ -26,9 +28,11 @@ enum class CardType {
             "SNACK_STASH", "SNACKSTASH" -> SnackStash
             "POWER_NAP", "POWERNAP" -> PowerNap
             "QUICK_PEEK", "QUICKPEEK" -> QuickPeek
+            "CAGE_SWAP", "CAGESWAP" -> CageSwap
             "SIGN_OF_FATE", "SIGNOFFATE" -> SignOfFate
             "SNIFF_AHEAD", "SNIFFAHEAD" -> SniffAhead
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
+            "TUNNEL_CHAOS", "TUNNELCHAOS" -> TunnelChaos
             "STEAL_CARD", "STEALCARD" -> StealCard
             "HYPER_MODE", "HYPERMODE" -> HyperMode
             "HAMSTER_FOUR", "HAMSTER4" -> FourHamsters

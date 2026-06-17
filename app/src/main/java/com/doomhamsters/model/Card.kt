@@ -10,7 +10,12 @@ enum class CardType {
     SnackStash,
     PowerNap,
     BegForSnacks,
+    HyperMode,
     QuickPeek,
+    SignOfFate,
+    SniffAhead,
+    FourHamsters,
+    StealCard,
     Normal;
 
     companion object {
@@ -20,7 +25,13 @@ enum class CardType {
             "SNACK_STASH", "SNACKSTASH" -> SnackStash
             "POWER_NAP", "POWERNAP" -> PowerNap
             "QUICK_PEEK", "QUICKPEEK" -> QuickPeek
+            "SIGN_OF_FATE", "SIGNOFFATE" -> SignOfFate
+            "SNIFF_AHEAD", "SNIFFAHEAD" -> SniffAhead
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
+            "STEAL_CARD", "STEALCARD" -> StealCard
+            "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
+            "HYPER_MODE", "HYPERMODE" -> HyperMode
+            "HAMSTER_FOUR", "HAMSTER4" -> FourHamsters
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)
         }

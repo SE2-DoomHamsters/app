@@ -27,6 +27,7 @@ data class CardCommandOutcome(
     val publicMessage: String,
     val privateMessage: String? = null,
     val revealedCard: Card? = null,
+    val revealedCards: List<Card> = emptyList(),
     val endsTurn: Boolean = false
 )
 
@@ -36,4 +37,6 @@ interface CardCommandSupport {
     fun discardFromHand(player: Player, card: Card)
     /** Returns the current top card of the deck without removing it. */
     fun peekTopCard(): Card?
+    /** Returns up to [n] top cards of the deck without removing them, top card first. */
+    fun peekTopCards(n: Int): List<Card>
 }

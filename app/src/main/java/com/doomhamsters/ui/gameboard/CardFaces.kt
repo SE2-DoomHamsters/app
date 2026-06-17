@@ -61,6 +61,7 @@ fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: 
         CardType.PowerNap -> Triple(Color(0xFFB8D8E8), Color(0xFF6A9FB5), CardDarkMaroon)
         CardType.QuickPeek -> Triple(Color(0xFFF8E7A2), Color(0xFFD6A93A), CardDarkMaroon)
         CardType.BegForSnacks -> Triple(Color(0xFFE8C9A0), Color(0xFFB8864E), CardDarkMaroon)
+        CardType.HyperMode -> Triple(Color(0xFFFFD54F), Color(0xFFFF9800), CardDarkMaroon)
         CardType.Normal -> Triple(BackgroundCream, AccentOrange, CardDarkMaroon)
     }
 

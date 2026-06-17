@@ -24,6 +24,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import com.doomhamsters.ui.gameboard.GameBoardUiState
 import org.json.JSONObject
 
 /**
@@ -90,6 +94,43 @@ open class GameBoardViewModel(
 
     private val _cardCommandNotice = MutableStateFlow<CardCommandNotice?>(null)
     val cardCommandNotice: StateFlow<CardCommandNotice?> = _cardCommandNotice
+    private val _showTargetSelectionDialog = MutableStateFlow(false)
+    val showTargetSelectionDialog: StateFlow<Boolean> = _showTargetSelectionDialog
+    private val _selectedCardForActivation = MutableStateFlow<Card?>(null)
+    val selectedCardForActivation: StateFlow<Card?> = _selectedCardForActivation
+    private val _isActivatingCard = MutableStateFlow(false)
+
+    val uiState: StateFlow<GameBoardUiState> = combine(
+        _gameState,
+        _isLocalPlayersTurn,
+        _pendingDoom,
+        _pendingDoomMessage,
+        _pendingDoomRequiresSelection,
+        _pendingDoomRequiresInsertionUi,
+        _pausedForDoomPlayerName,
+        _pausedForDoomMessage,
+        _pausedForDoomDetail,
+        _cardCommandNotice,
+        _connectionStatus
+    ) { flows ->
+        GameBoardUiState(
+            gameState = flows[0] as GameState?,
+            isLocalPlayersTurn = flows[1] as Boolean,
+            pendingDoom = flows[2] as Card?,
+            pendingDoomMessage = flows[3] as String?,
+            pendingDoomRequiresSelection = flows[4] as Boolean,
+            pendingDoomRequiresInsertionUi = flows[5] as Boolean,
+            pausedForDoomPlayerName = flows[6] as String?,
+            pausedForDoomMessage = flows[7] as String?,
+            pausedForDoomDetail = flows[8] as String?,
+            cardCommandNotice = flows[9] as CardCommandNotice?,
+            connectionStatus = flows[10] as ConnectionStatus
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = GameBoardUiState()
+    )
     private var awaitingLocalDrawOutcome = false
     private var doomOutcomeLogged = false
     private var pendingPrivateDoomCard: Card? = null
@@ -97,6 +138,7 @@ open class GameBoardViewModel(
     init {
         connectAndObserveRemoteState()
     }
+
     private val cardActivation = CardActivationHandler(
         gameId = gameId,
         repository = repository,
@@ -124,25 +166,32 @@ open class GameBoardViewModel(
             subscribeWithReconnect()
         }
     }
+
     private suspend fun subscribeWithReconnect() {
         var attempt = 0
         while (attempt <= maxReconnectAttempts) {
             // --- RECONNECT PHASE (skipped on first run when attempt == 0) ---
             if (attempt > 0) {
-                _connectionStatus.value = ConnectionStatus.Reconnecting(attempt, maxReconnectAttempts)
-                val delayMs = reconnectBackoffMs.getOrElse(attempt - 1) { reconnectBackoffMs.last()}
+                _connectionStatus.value =
+                    ConnectionStatus.Reconnecting(attempt, maxReconnectAttempts)
+                val delayMs =
+                    reconnectBackoffMs.getOrElse(attempt - 1) { reconnectBackoffMs.last() }
                 delay(delayMs) // wait 1s, 2s, 4s before trying again
                 try {
                     runCatching { repository.disconnect() } // connection may be dead
                     repository.connect()
-                    refreshGameState( resolvePlayerId = false ) // game state will be restored via REST Call form sessions.json
+                    refreshGameState(resolvePlayerId = false) // game state will be restored via REST Call form sessions.json
                     _connectionStatus.value = ConnectionStatus.Connected
                     addLog("Reconnected.")
                     attempt = 0
                 } catch (e: CancellationException) {
                     throw e // ViewModel is being destroyed
                 } catch (e: Exception) {
-                    Log.e(tag, "Reconnect attempt $attempt/$maxReconnectAttempts failed gameId=$gameId", e)
+                    Log.e(
+                        tag,
+                        "Reconnect attempt $attempt/$maxReconnectAttempts failed gameId=$gameId",
+                        e
+                    )
                     attempt++
                     continue
                 }
@@ -157,14 +206,20 @@ open class GameBoardViewModel(
                         repository.subscribeToGameState(gameId)
                             .collect { state ->
                                 runCatching { applyGameState(state, resolvePlayerId = false) }
-                                    .onFailure { e -> Log.e(tag, "State apply error gameId=$gameId", e) }
+                                    .onFailure { e ->
+                                        Log.e(
+                                            tag,
+                                            "State apply error gameId=$gameId",
+                                            e
+                                        )
+                                    }
                             }
                     }
                     launch {
                         repository.subscribeToGame(gameId)
                             .collect { payload ->
                                 runCatching { JSONObject(payload) }.getOrNull()
-                                    ?.let { event -> runCatching { handlePublicGameEvent(event) }}
+                                    ?.let { event -> runCatching { handlePublicGameEvent(event) } }
                             }
                     }
                     launch {
@@ -181,7 +236,11 @@ open class GameBoardViewModel(
             } catch (e: CancellationException) {
                 throw e // ViewModel destroyed
             } catch (e: Exception) {
-                Log.w(tag, "Subscription lost attempt=$attempt/$maxReconnectAttempts gameId=$gameId", e)
+                Log.w(
+                    tag,
+                    "Subscription lost attempt=$attempt/$maxReconnectAttempts gameId=$gameId",
+                    e
+                )
                 _connectionStatus.value = ConnectionStatus.Disconnected
                 attempt++
             }
@@ -254,6 +313,7 @@ open class GameBoardViewModel(
                     doomOutcomeLogged = true
                 }
             }
+
             CardCommandEventType.CARD_COMMAND_RESULT.name -> {
                 val parsedEvent = CardCommandEvent.fromJsonOrNull(event) ?: return
                 when (parsedEvent.commandId) {
@@ -268,6 +328,32 @@ open class GameBoardViewModel(
                             revealedCard = parsedEvent.revealedCard
                         )
                     }
+
+                    CardCommandId.STEAL_CARD -> {
+                        val title = parsedEvent.card?.displayName() ?: "Tiny Thief"
+                        val stolenCardName = parsedEvent.revealedCard?.displayName() ?: "a card"
+
+                        _cardCommandNotice.value = CardCommandNotice(
+                            title = title,
+                            message = "You stole $stolenCardName!",
+                            revealedCard = parsedEvent.revealedCard
+                        )
+                    }
+
+                    CardCommandId.SNIFF_AHEAD -> {
+                        val title = parsedEvent.card?.displayName() ?: "Sniff Ahead"
+                        val message = parsedEvent.message
+                            ?: if (parsedEvent.revealedCards.isEmpty()) "The deck is empty."
+                            else "Top ${parsedEvent.revealedCards.size} card(s): ${
+                                parsedEvent.revealedCards.joinToString(", ") { it.displayName() }
+                            }."
+                        _cardCommandNotice.value = CardCommandNotice(
+                            title = title,
+                            message = message,
+                            revealedCards = parsedEvent.revealedCards
+                        )
+                    }
+
                     else -> Unit
                 }
             }
@@ -303,7 +389,10 @@ open class GameBoardViewModel(
             val resolvedPlayerId = resolveUniquePlayerIdByName(snapshot)
 
             if (!resolvedPlayerId.isNullOrBlank() && resolvedPlayerId != localPlayerId) {
-                Log.d(tag, "Updating localPlayerId from snapshot oldId=$localPlayerId newId=$resolvedPlayerId")
+                Log.d(
+                    tag,
+                    "Updating localPlayerId from snapshot oldId=$localPlayerId newId=$resolvedPlayerId"
+                )
                 localPlayerId = resolvedPlayerId
             }
         }
@@ -322,8 +411,10 @@ open class GameBoardViewModel(
 
     private fun preserveLocalHand(snapshot: GameState): GameState {
         val previousState = _gameState.value ?: return snapshot
-        val previousLocalPlayer = previousState.players.firstOrNull { it.id == localPlayerId } ?: return snapshot
-        val incomingLocalPlayer = snapshot.players.firstOrNull { it.id == localPlayerId } ?: return snapshot
+        val previousLocalPlayer =
+            previousState.players.firstOrNull { it.id == localPlayerId } ?: return snapshot
+        val incomingLocalPlayer =
+            snapshot.players.firstOrNull { it.id == localPlayerId } ?: return snapshot
 
         val isResolvingLocalDoom = snapshot.resolvingDoomPlayerId == localPlayerId
         val incomingHandSize = incomingLocalPlayer.visibleHandSize()
@@ -339,7 +430,7 @@ open class GameBoardViewModel(
             isResolvingLocalDoom &&
             previousLocalPlayer.hand.any { it.type == CardType.SnackStash } &&
             incomingLocalPlayer.hand.count { it.type == CardType.SnackStash } <
-                previousLocalPlayer.hand.count { it.type == CardType.SnackStash }
+            previousLocalPlayer.hand.count { it.type == CardType.SnackStash }
         ) {
             incomingLocalPlayer.hand.clear()
             incomingLocalPlayer.hand.addAll(previousLocalPlayer.hand)
@@ -414,8 +505,10 @@ open class GameBoardViewModel(
 
         if (!awaitingLocalDrawOutcome) return
 
-        val previousLocalPlayer = previousState?.players?.firstOrNull { it.id == localPlayerId } ?: return
-        val currentLocalPlayer = currentState.players.firstOrNull { it.id == localPlayerId } ?: return
+        val previousLocalPlayer =
+            previousState?.players?.firstOrNull { it.id == localPlayerId } ?: return
+        val currentLocalPlayer =
+            currentState.players.firstOrNull { it.id == localPlayerId } ?: return
 
         if (currentLocalPlayer.lives < previousLocalPlayer.lives) {
             showDoomNotice(
@@ -431,7 +524,7 @@ open class GameBoardViewModel(
         if (
             currentLocalPlayer.hand.size > previousLocalPlayer.hand.size ||
             currentLocalPlayer.hand.count { it.type == CardType.SnackStash } <
-                previousLocalPlayer.hand.count { it.type == CardType.SnackStash } ||
+            previousLocalPlayer.hand.count { it.type == CardType.SnackStash } ||
             currentState.currentTurnPlayerId != localPlayerId
         ) {
             awaitingLocalDrawOutcome = false
@@ -468,9 +561,12 @@ open class GameBoardViewModel(
     open fun draw(playerId: String) {
         val isResolvingLocalDoom =
             _pendingDoom.value != null ||
-                _gameState.value?.resolvingDoomPlayerId == localPlayerId
+                    _gameState.value?.resolvingDoomPlayerId == localPlayerId
 
-        if (playerId != localPlayerId || !_isLocalPlayersTurn.value || isResolvingLocalDoom) {
+        if (playerId != localPlayerId || !_isLocalPlayersTurn.value || isResolvingLocalDoom ||
+            awaitingLocalDrawOutcome ||
+            _isActivatingCard.value
+        ) {
             Log.d(
                 tag,
                 "Draw ignored gameId=$gameId requestedPlayerId=$playerId localPlayerId=$localPlayerId isLocalPlayersTurn=${_isLocalPlayersTurn.value} isResolvingLocalDoom=$isResolvingLocalDoom"
@@ -513,18 +609,24 @@ open class GameBoardViewModel(
         val state = _gameState.value
         val isResolvingLocalDoom =
             state?.resolvingDoomPlayerId == localPlayerId &&
-                state.pendingDoomRequiresInsertion &&
-                _pendingDoomRequiresInsertionUi.value &&
-                _pendingDoom.value != null
+                    state.pendingDoomRequiresInsertion &&
+                    _pendingDoomRequiresInsertionUi.value &&
+                    _pendingDoom.value != null
 
         if (!isResolvingLocalDoom) {
-            Log.d(tag, "Insert doom ignored gameId=$gameId isResolvingLocalDoom=$isResolvingLocalDoom")
+            Log.d(
+                tag,
+                "Insert doom ignored gameId=$gameId isResolvingLocalDoom=$isResolvingLocalDoom"
+            )
             return
         }
 
         viewModelScope.launch {
             try {
-                Log.d(tag, "Sending doom insert gameId=$gameId playerId=$localPlayerId position=$position")
+                Log.d(
+                    tag,
+                    "Sending doom insert gameId=$gameId playerId=$localPlayerId position=$position"
+                )
                 repository.sendAction(
                     gameId,
                     "doom/insert",
@@ -538,7 +640,11 @@ open class GameBoardViewModel(
                 repository.sendAction(gameId, "nextTurn", JSONObject())
                 broadcastLatestState()
             } catch (e: Exception) {
-                Log.e(tag, "Doom insert failed gameId=$gameId playerId=$localPlayerId position=$position", e)
+                Log.e(
+                    tag,
+                    "Doom insert failed gameId=$gameId playerId=$localPlayerId position=$position",
+                    e
+                )
                 _error.emit("Doom insert failed: ${e.message}")
             }
         }
@@ -584,7 +690,7 @@ open class GameBoardViewModel(
     fun canActivateCard(card: Card): Boolean = cardActivation.canActivate(card)
 
     /** Sends the activation request for a playable card. */
-    fun activateCard(card: Card) = cardActivation.activate(card)
+    //fun activateCard(card: Card) = cardActivation.activate(card)
 
     /** Called by the UI once the player has chosen a target and card type. */
     fun activateCardWithTargets(
@@ -594,10 +700,78 @@ open class GameBoardViewModel(
         hamsterType: String? = null
     ) = cardActivation.activateWithTargets(card, targetPlayerId, requestedCardType, hamsterType)
 
-    /** Cancels a pending targeted-card selection. */
-    fun cancelTargetedCardSelection() = cardActivation.cancelSelection()
+    fun activateCard(card: Card, parameters: Map<String, Any> = emptyMap()) {
+        val command = CardRegistry.commandFor(card) ?: return
+        if (!canActivateCard(card)) {
+            Log.d(
+                tag,
+                "Activate card ignored gameId=$gameId cardId=${card.id} cardType=${card.type}"
+            )
+            return
+        }
+        if (card.type == CardType.StealCard && !parameters.containsKey("targetPlayerId")) {
+            _selectedCardForActivation.value = card
+            _showTargetSelectionDialog.value = true
+            return
+        }
+
+        /** Cancels a pending targeted-card selection. */
+        fun cancelTargetedCardSelection() = cardActivation.cancelSelection()
 
 
+        viewModelScope.launch {
+            try {
+                _isActivatingCard.value = true
+                Log.d(
+                    tag,
+                    "Sending card activation gameId=$gameId playerId=$localPlayerId cardId=${card.id} commandId=${command.id}"
+                )
+                repository.sendAction(
+                    gameId,
+                    command.actionPath,
+                    CardCommandRequest(
+                        playerId = localPlayerId,
+                        cardId = card.id,
+                        cardType = card.type,
+                        commandId = command.id
+                    ).toJson().apply {
+                        if (parameters.isNotEmpty()) {
+                            val paramsJson = JSONObject()
+                            parameters.forEach { (key, value) -> paramsJson.put(key, value) }
+                            put(
+                                "parameters",
+                                paramsJson
+                            ) // 'put' packt es direkt in das fertige toJson()
+                        }
+                    })
+                broadcastLatestState()
+            } catch (e: Exception) {
+                Log.e(
+                    tag,
+                    "Card activation failed gameId=$gameId playerId=$localPlayerId cardId=${card.id}",
+                    e
+                )
+                _error.emit("Card activation failed: ${e.message}")
+            } finally {
+                _isActivatingCard.value = false
+            }
+        }
+    }
+
+    fun selectStealTarget(targetPlayerId: String) {
+        val card = _selectedCardForActivation.value ?: return
+        _showTargetSelectionDialog.value = false // Dialog schließen
+
+        // Jetzt feuern wir die Karte ab – diesmal MIT dem Parameter!
+        activateCard(card, mapOf("targetPlayerId" to targetPlayerId))
+        _selectedCardForActivation.value = null
+    }
+
+    /** Wird aufgerufen, wenn der Spieler den Auswahldialog abbricht */
+    fun dismissTargetSelection() {
+        _showTargetSelectionDialog.value = false
+        _selectedCardForActivation.value = null
+    }
 
     /** Advances the local Doom flow after the player acknowledges the current notice. */
     fun dismissDoomNotice(selectedPlayerCardIndex: Int = -1) {
@@ -619,7 +793,11 @@ open class GameBoardViewModel(
             viewModelScope.launch {
                 try {
                     Log.d(tag, "Sending doom ack gameId=$gameId playerId=$localPlayerId")
-                    repository.sendAction(gameId, "doom/ack", JSONObject().put("playerId", localPlayerId))
+                    repository.sendAction(
+                        gameId,
+                        "doom/ack",
+                        JSONObject().put("playerId", localPlayerId)
+                    )
                     broadcastLatestState()
                     Log.d(tag, "Sending nextTurn after doom acknowledgement gameId=$gameId")
                     repository.sendAction(gameId, "nextTurn", JSONObject())

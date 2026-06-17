@@ -1,5 +1,4 @@
 package com.doomhamsters.viewmodel
-
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -24,6 +23,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import com.doomhamsters.ui.gameboard.GameBoardUiState
 import org.json.JSONObject
 
 /**
@@ -95,6 +98,38 @@ open class GameBoardViewModel(
     private val _selectedCardForActivation = MutableStateFlow<Card?>(null)
     val selectedCardForActivation: StateFlow<Card?> = _selectedCardForActivation
     private val _isActivatingCard = MutableStateFlow(false)
+
+    val uiState: StateFlow<GameBoardUiState> = combine(
+        _gameState,
+        _isLocalPlayersTurn,
+        _pendingDoom,
+        _pendingDoomMessage,
+        _pendingDoomRequiresSelection,
+        _pendingDoomRequiresInsertionUi,
+        _pausedForDoomPlayerName,
+        _pausedForDoomMessage,
+        _pausedForDoomDetail,
+        _cardCommandNotice,
+        _connectionStatus
+    ) { flows ->
+        GameBoardUiState(
+            gameState = flows[0] as GameState?,
+            isLocalPlayersTurn = flows[1] as Boolean,
+            pendingDoom = flows[2] as Card?,
+            pendingDoomMessage = flows[3] as String?,
+            pendingDoomRequiresSelection = flows[4] as Boolean,
+            pendingDoomRequiresInsertionUi = flows[5] as Boolean,
+            pausedForDoomPlayerName = flows[6] as String?,
+            pausedForDoomMessage = flows[7] as String?,
+            pausedForDoomDetail = flows[8] as String?,
+            cardCommandNotice = flows[9] as CardCommandNotice?,
+            connectionStatus = flows[10] as ConnectionStatus
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = GameBoardUiState()
+    )
     private var awaitingLocalDrawOutcome = false
     private var doomOutcomeLogged = false
     private var pendingPrivateDoomCard: Card? = null
@@ -102,6 +137,19 @@ open class GameBoardViewModel(
     init {
         connectAndObserveRemoteState()
     }
+    private val cardActivation = CardActivationHandler(
+        gameId = gameId,
+        repository = repository,
+        scope = viewModelScope,
+        error = _error,
+        getLocalPlayerId = { localPlayerId },
+        getGameState = { _gameState.value },
+        isPendingDoom = { _pendingDoom.value != null },
+        isLocalPlayersTurn = { _isLocalPlayersTurn.value },
+        onStateChanged = { broadcastLatestState() }
+    )
+
+    val pendingTargetedCard: StateFlow<Card?> = cardActivation.pendingTargetedCard
 
     private fun connectAndObserveRemoteState() {
         viewModelScope.launch {
@@ -582,20 +630,7 @@ open class GameBoardViewModel(
     }
 
     /** Returns whether the local player can activate the supplied card right now. */
-    fun canActivateCard(card: Card): Boolean {
-        val state = _gameState.value ?: return false
-        val localPlayer = state.players.firstOrNull { it.id == localPlayerId } ?: return false
-        val isResolvingLocalDoom =
-            _pendingDoom.value != null ||
-                state.resolvingDoomPlayerId == localPlayerId
-        val command = CardRegistry.commandFor(card) ?: return false
-
-        return !_isActivatingCard.value &&
-            !isResolvingLocalDoom &&
-            _isLocalPlayersTurn.value &&
-            localPlayer.hand.any { it.id == card.id || (card.id == null && it == card) } &&
-            command.actionPath.isNotBlank()
-    }
+    fun canActivateCard(card: Card): Boolean = cardActivation.canActivate(card)
 
     /** Sends the activation request for a playable card. */
     fun activateCard(card: Card,parameters: Map<String, Any> = emptyMap()) {
@@ -652,6 +687,20 @@ open class GameBoardViewModel(
         _showTargetSelectionDialog.value = false
         _selectedCardForActivation.value = null
     }
+    fun activateCard(card: Card) = cardActivation.activate(card)
+
+    /** Called by the UI once the player has chosen a target and card type. */
+    fun activateCardWithTargets(
+        card: Card,
+        targetPlayerId: String,
+        requestedCardType: String,
+        hamsterType: String? = null
+    ) = cardActivation.activateWithTargets(card, targetPlayerId, requestedCardType, hamsterType)
+
+    /** Cancels a pending targeted-card selection. */
+    fun cancelTargetedCardSelection() = cardActivation.cancelSelection()
+
+
 
     /** Advances the local Doom flow after the player acknowledges the current notice. */
     fun dismissDoomNotice(selectedPlayerCardIndex: Int = -1) {
@@ -720,4 +769,5 @@ open class GameBoardViewModel(
         val matchingPlayers = snapshot.players.filter { it.name == localPlayerName }
         return matchingPlayers.singleOrNull()?.id
     }
+
 }

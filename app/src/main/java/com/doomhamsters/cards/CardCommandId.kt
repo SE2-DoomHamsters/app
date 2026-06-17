@@ -6,7 +6,8 @@ enum class CardCommandId {
     POWER_NAP,
     HYPER_MODE,
     BEG_FOR_SNACKS,
-    QUICK_PEEK;
+    QUICK_PEEK,
+    SNIFF_AHEAD;
 
     companion object {
         /** Maps backend wire values to a known card command identifier. */

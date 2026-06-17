@@ -4,11 +4,14 @@ package com.doomhamsters.ui.gameboard
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -62,14 +65,20 @@ fun CardCommandNoticeOverlay(
                 textAlign = TextAlign.Center
             )
             notice.revealedCard?.let { revealedCard ->
-                Box(
-                    modifier = Modifier.padding(top = 4.dp)
+                Box(modifier = Modifier.padding(top = 4.dp)) {
+                    CardFaceUp(card = revealedCard, isSelected = false, isDefocused = false)
+                }
+            }
+            if (notice.revealedCards.isNotEmpty()) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .padding(top = 4.dp)
+                        .horizontalScroll(rememberScrollState())
                 ) {
-                    CardFaceUp(
-                        card = revealedCard,
-                        isSelected = false,
-                        isDefocused = false
-                    )
+                    notice.revealedCards.forEach { revealedCard ->
+                        CardFaceUp(card = revealedCard, isSelected = false, isDefocused = false)
+                    }
                 }
             }
             Text(

@@ -68,6 +68,7 @@ fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: 
         CardType.FourHamsters -> Triple(Color(0xFFE1BEE7), Color(0xFFBA68C8), CardDarkMaroon)
         CardType.HyperMode -> Triple(Color(0xFFFFA726), Color(0xFFF57C00), CardDarkMaroon)
         CardType.StealCard -> Triple(Color(0xFFF8E7A2), Color(0xFFD6A93A), CardDarkMaroon)
+        CardType.TwoHamsters -> Triple(Color(0xFFCE93D8), Color(0xFFAB47BC), CardDarkMaroon)
         CardType.Normal -> Triple(BackgroundCream, AccentOrange, CardDarkMaroon)
     }
 

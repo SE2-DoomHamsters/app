@@ -18,6 +18,7 @@ enum class CardType {
     CageSwap,
     FourHamsters,
     StealCard,
+    TwoHamsters,
     Normal;
 
     companion object {
@@ -34,7 +35,8 @@ enum class CardType {
             "TUNNEL_CHAOS", "TUNNELCHAOS" -> TunnelChaos
             "STEAL_CARD", "STEALCARD" -> StealCard
             "HYPER_MODE", "HYPERMODE" -> HyperMode
-            "HAMSTER_FOUR", "HAMSTER4" -> FourHamsters
+            "HAMSTER_FOUR", "HAMSTER4", "HAMSTERTWO" -> FourHamsters
+            "HAMSTER_TWO", "HAMSTER2" -> TwoHamsters
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)
         }

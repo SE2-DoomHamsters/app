@@ -4,11 +4,12 @@ package com.doomhamsters.cards
 /** Lists the supported activatable card command identifiers. */
 enum class CardCommandId {
     POWER_NAP,
+    TWO_HAMSTERS,
+    QUICK_PEEK,
     FOUR_HAMSTERS,
     SIGN_OF_FATE,
     HYPER_MODE,
     BEG_FOR_SNACKS,
-    QUICK_PEEK,
     SNIFF_AHEAD,
     CAGE_SWAP,
     TUNNEL_CHAOS,

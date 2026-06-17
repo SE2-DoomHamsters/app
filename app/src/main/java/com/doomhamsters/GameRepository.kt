@@ -76,6 +76,15 @@ class GameRepository(
                 JSONObject(payload)
             }
 
+    /** Subscribes to player-specific error events for rejected or failed actions. */
+    suspend fun subscribeToErrors(gameId: String, playerId: String): Flow<String> =
+        requireSession()
+            .subscribeText("/queue/game/$gameId/$playerId/errors")
+            .map { payload ->
+                Log.d(tag, "WS error-event gameId=$gameId playerId=$playerId payload=$payload")
+                JSONObject(payload).optString("message", "An error occurred.")
+            }
+
     /** Fetches the latest game state snapshot over REST. */
     suspend fun fetchGameState(gameId: String, playerId: String): GameState {
         Log.d(tag, "REST fetch /api/game/$gameId/state?playerId=$playerId")

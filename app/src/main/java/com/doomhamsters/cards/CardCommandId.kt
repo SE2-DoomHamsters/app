@@ -11,9 +11,9 @@ enum class CardCommandId {
     HYPER_MODE,
     BEG_FOR_SNACKS,
     SNIFF_AHEAD,
+    CAGE_SWAP,
+    TUNNEL_CHAOS,
     STEAL_CARD;
-
-
 
 
     companion object {

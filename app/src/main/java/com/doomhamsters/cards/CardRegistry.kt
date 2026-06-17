@@ -16,8 +16,8 @@ import com.doomhamsters.cards.definitions.SnackStashCardDefinition
 import com.doomhamsters.cards.definitions.StealCardDefinition
 import com.doomhamsters.cards.definitions.SniffAheadCardDefinition
 import com.doomhamsters.cards.definitions.BegForSnacksCardDefinition
-import com.doomhamsters.cards.definitions.TunnelChaosCardDefinition
 import com.doomhamsters.cards.definitions.TwoHamstersCardDefinition
+import com.doomhamsters.cards.definitions.TunnelChaosCardDefinition
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 

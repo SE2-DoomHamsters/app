@@ -15,10 +15,13 @@ import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 import com.doomhamsters.model.GameState
 import com.doomhamsters.model.Status
+import com.doomhamsters.cheating.SnackStashUiEffect
+import com.doomhamsters.cheating.SnackStashViewModelFeature
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -85,6 +88,19 @@ open class GameBoardViewModel(
     val showTargetSelectionDialog: StateFlow<Boolean> = _showTargetSelectionDialog
     private val _selectedCardForActivation = MutableStateFlow<Card?>(null)
     val selectedCardForActivation: StateFlow<Card?> = _selectedCardForActivation
+    val snackStash = SnackStashViewModelFeature(
+        gameId = gameId,
+        localPlayerId = { localPlayerId },
+        isLocalPlayersTurn = { _isLocalPlayersTurn.value },
+        pendingDoomRequiresSelection = { _pendingDoomRequiresSelection.value },
+        gameState = { _gameState.value },
+        sendAction = { action, payload -> repository.sendAction(gameId, action, payload) },
+        refreshGameState = { broadcastLatestState() },
+        showWaitingForVotes = { applySnackStashEffect(SnackStashUiEffect.WaitingForVotes) },
+        clearPendingDoomUi = { clearPendingDoomUi() },
+        launchAction = ::launchSnackStashAction,
+        logDebug = { message -> Log.d(tag, message) }
+    )
     private val _isActivatingCard = MutableStateFlow(false)
 
     val uiState: StateFlow<GameBoardUiState> = combine(
@@ -164,6 +180,13 @@ open class GameBoardViewModel(
     }
 
     private fun handlePublicGameEvent(event: JSONObject) {
+        val snackStashEventResult = snackStash.handlePublicEvent(event)
+        if (snackStashEventResult.handled) {
+            applySnackStashEffect(snackStashEventResult.effect)
+            snackStashEventResult.logMessage?.let(::addLog)
+            return
+        }
+
         val parsedEvent = CardCommandEvent.fromJsonOrNull(event) ?: return
         if (parsedEvent.type != CardCommandEventType.CARD_COMMAND_PLAYED) return
 
@@ -190,6 +213,9 @@ open class GameBoardViewModel(
                 if (!doomOutcomeLogged) {
                     addLog("You drew a Doom card.")
                     doomOutcomeLogged = true
+                }
+                _gameState.value?.let { currentState ->
+                    resolveLocalDoomNotice(currentState, currentState)
                 }
             }
 
@@ -279,6 +305,7 @@ open class GameBoardViewModel(
         val mergedSnapshot = preserveLocalHand(snapshot)
         _gameState.value = mergedSnapshot
         _isLocalPlayersTurn.value = mergedSnapshot.currentTurnPlayerId == localPlayerId
+        applySnackStashEffect(snackStash.syncFromGameState(mergedSnapshot))
         syncDoomResolutionState(mergedSnapshot)
         resolveLocalDoomNotice(previousState, mergedSnapshot)
         Log.d(
@@ -307,6 +334,7 @@ open class GameBoardViewModel(
 
         if (
             isResolvingLocalDoom &&
+            !snapshot.pendingDoomRequiresInsertion &&
             previousLocalPlayer.hand.any { it.type == CardType.SnackStash } &&
             incomingLocalPlayer.hand.count { it.type == CardType.SnackStash } <
             previousLocalPlayer.hand.count { it.type == CardType.SnackStash }
@@ -316,6 +344,34 @@ open class GameBoardViewModel(
         }
 
         return snapshot
+    }
+
+    private fun launchSnackStashAction(userErrorMessage: String, action: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                action()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.e(tag, "$userErrorMessage gameId=$gameId playerId=$localPlayerId", e)
+                _error.emit("$userErrorMessage: ${e.message}")
+            }
+        }
+    }
+
+    private fun applySnackStashEffect(effect: SnackStashUiEffect) {
+        when (effect) {
+            SnackStashUiEffect.None -> Unit
+            SnackStashUiEffect.WaitingForVotes -> {
+                _pendingDoomRequiresSelection.value = false
+                _pendingDoomMessage.value = "Waiting for votes."
+            }
+            SnackStashUiEffect.ClearDoomSelection -> {
+                _pendingDoomRequiresSelection.value = false
+                _pendingDoomRequiresInsertionUi.value = false
+                _pendingDoomMessage.value = null
+            }
+        }
     }
 
     private fun syncDoomResolutionState(state: GameState) {
@@ -348,21 +404,37 @@ open class GameBoardViewModel(
             return
         }
 
-        _pausedForDoomMessage.value = "$resolvingPlayerName was hit by Doom."
-        _pausedForDoomDetail.value = "They are acknowledging the life loss before play continues."
+        _pausedForDoomMessage.value = "$resolvingPlayerName drew Doom."
+        _pausedForDoomDetail.value = "They can claim Snack Stash or accept the hit."
     }
 
     private fun resolveLocalDoomNotice(previousState: GameState?, currentState: GameState) {
         val hasPendingLocalDoom =
             currentState.resolvingDoomPlayerId == localPlayerId && pendingPrivateDoomCard != null
 
+        if (
+            currentState.resolvingDoomPlayerId == localPlayerId &&
+            !currentState.pendingDoomRequiresInsertion &&
+            currentState.pendingSnackStashClaim == null &&
+            _pendingDoom.value == null
+        ) {
+            showDoomNotice(
+                card = pendingPrivateDoomCard ?: Card(CardType.Doom),
+                message = "Use Snack Stash, bluff with another card, or accept Doom.",
+                requiresSelection = true
+            )
+            pendingPrivateDoomCard = null
+            awaitingLocalDrawOutcome = false
+            return
+        }
+
         if (hasPendingLocalDoom && _pendingDoom.value == null) {
             if (currentState.pendingDoomRequiresInsertion) {
                 showDoomNotice(
                     card = pendingPrivateDoomCard ?: Card(CardType.Doom),
-                    message = "Scroll to your Snack Stash and select it.",
-                    requiresSelection = true,
-                    requiresInsertionUi = false
+                    message = "",
+                    requiresSelection = false,
+                    requiresInsertionUi = true
                 )
                 pendingPrivateDoomCard = null
                 awaitingLocalDrawOutcome = false
@@ -371,14 +443,28 @@ open class GameBoardViewModel(
 
             showDoomNotice(
                 card = pendingPrivateDoomCard ?: Card(CardType.Doom),
-                message = "You lost 1 life."
+                message = "Use Snack Stash, bluff with another card, or accept Doom.",
+                requiresSelection = true
             )
-            pendingPrivateDoomCard = null
             awaitingLocalDrawOutcome = false
             if (!doomOutcomeLogged) {
-                addLog("You drew a Doom card and lost 1 life.")
+                addLog("You drew a Doom card.")
                 doomOutcomeLogged = true
             }
+            return
+        }
+
+        if (
+            currentState.resolvingDoomPlayerId == localPlayerId &&
+            currentState.pendingDoomRequiresInsertion &&
+            _pendingDoom.value != null &&
+            !_pendingDoomRequiresInsertionUi.value
+        ) {
+            _pendingDoomRequiresSelection.value = false
+            _pendingDoomRequiresInsertionUi.value = true
+            _pendingDoomMessage.value = null
+            pendingPrivateDoomCard = null
+            awaitingLocalDrawOutcome = false
             return
         }
 
@@ -475,6 +561,10 @@ open class GameBoardViewModel(
             awaitingLocalDrawOutcome = false
             return
         }
+        if (_gameState.value?.resolvingDoomPlayerId == localPlayerId) {
+            awaitingLocalDrawOutcome = false
+            return
+        }
         awaitingLocalDrawOutcome = false
         if (_isLocalPlayersTurn.value) {
             Log.d(tag, "Auto-advancing turn after resolved draw gameId=$gameId")
@@ -526,20 +616,6 @@ open class GameBoardViewModel(
                 )
                 _error.emit("Doom insert failed: ${e.message}")
             }
-        }
-    }
-
-    /** Reports that Doom defusal is handled automatically by the server. */
-    open fun defusePendingDoom(card: Card?) {
-        viewModelScope.launch {
-            _error.emit("Doom is resolved automatically by the server.")
-        }
-    }
-
-    /** Reports that Doom acceptance is handled automatically by the server. */
-    open fun acceptDoom() {
-        viewModelScope.launch {
-            _error.emit("Doom is resolved automatically by the server.")
         }
     }
 
@@ -655,14 +731,6 @@ open class GameBoardViewModel(
     /** Advances the local Doom flow after the player acknowledges the current notice. */
     fun dismissDoomNotice(selectedPlayerCardIndex: Int = -1) {
         if (_pendingDoomRequiresSelection.value) {
-            val localPlayer = _gameState.value?.players?.firstOrNull { it.id == localPlayerId }
-            val selectedCard = localPlayer?.hand?.getOrNull(selectedPlayerCardIndex)
-            val snackStash = selectedCard?.takeIf { it.type == CardType.SnackStash }
-                ?: localPlayer?.hand?.firstOrNull { it.type == CardType.SnackStash }
-            snackStash?.let { localPlayer?.hand?.remove(it) }
-            _pendingDoomRequiresSelection.value = false
-            _pendingDoomRequiresInsertionUi.value = true
-            _pendingDoomMessage.value = null
             return
         }
 
@@ -713,6 +781,7 @@ open class GameBoardViewModel(
         _pausedForDoomPlayerName.value = null
         _pausedForDoomMessage.value = null
         _pausedForDoomDetail.value = null
+        snackStash.clearClaim()
         pendingPrivateDoomCard = null
     }
 

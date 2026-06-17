@@ -5,6 +5,7 @@ package com.doomhamsters.cards
 enum class CardCommandId {
     POWER_NAP,
     STEAL_CARD,
+    BEG_FOR_SNACKS,
     QUICK_PEEK;
 
 

@@ -9,8 +9,9 @@ enum class CardType {
     Doom,
     SnackStash,
     PowerNap,
+    BegForSnacks,
     QuickPeek,
-
+    SniffAhead,
     Normal;
 
     companion object {
@@ -20,6 +21,8 @@ enum class CardType {
             "SNACK_STASH", "SNACKSTASH" -> SnackStash
             "POWER_NAP", "POWERNAP" -> PowerNap
             "QUICK_PEEK", "QUICKPEEK" -> QuickPeek
+            "SNIFF_AHEAD", "SNIFFAHEAD" -> SniffAhead
+            "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)
         }

@@ -30,12 +30,10 @@ jobs:
       - name: Decode keystore and create keystore.properties
         run: |
           echo "$KEYSTORE_BASE64" | base64 --decode > ${{ github.workspace }}/release.jks
-          cat > ${{ github.workspace }}/keystore.properties << EOF
-          storeFile=${{ github.workspace }}/release.jks
-          storePassword=$KEY_STORE_PASSWORD
-          keyAlias=$KEY_ALIAS
-          keyPassword=$KEY_PASSWORD
-          EOF
+          echo "storeFile=${{ github.workspace }}/release.jks" > ${{ github.workspace }}/keystore.properties
+          echo "storePassword=$KEY_STORE_PASSWORD" >> ${{ github.workspace }}/keystore.properties
+          echo "keyAlias=$KEY_ALIAS" >> ${{ github.workspace }}/keystore.properties
+          echo "keyPassword=$KEY_PASSWORD" >> ${{ github.workspace }}/keystore.properties
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}

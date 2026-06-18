@@ -41,4 +41,15 @@ object MascotPresentation {
         from == MascotAnimation.YOUR_TURN && to == MascotAnimation.IDLE -> MascotAnimation.TURNING_BACK
         else -> null
     }
+
+    /**
+     * Whether a swap should play the squash-and-stretch: true when the incoming
+     * animation wants it on entry or the outgoing one wants it on exit.
+     *
+     * @param from the animation being left.
+     * @param to the animation being entered.
+     * @return true if this swap should squash.
+     */
+    fun shouldSquash(from: MascotAnimation, to: MascotAnimation): Boolean =
+        to.squashOnSwap || from.squashOnExit
 }

@@ -84,6 +84,23 @@ class MascotPresentationTest {
     }
 
     @Test
+    fun `swap squashes when incoming wants it on entry`() {
+        // DOOM has squashOnSwap = true.
+        assertEquals(true, MascotPresentation.shouldSquash(MascotAnimation.IDLE, MascotAnimation.DOOM))
+    }
+
+    @Test
+    fun `swap squashes when outgoing wants it on exit`() {
+        // CARD_PLAYED has squashOnExit = true; IDLE does not squash on entry.
+        assertEquals(true, MascotPresentation.shouldSquash(MascotAnimation.CARD_PLAYED, MascotAnimation.IDLE))
+    }
+
+    @Test
+    fun `swap does not squash when neither side opts in`() {
+        assertEquals(false, MascotPresentation.shouldSquash(MascotAnimation.IDLE, MascotAnimation.YOUR_TURN))
+    }
+
+    @Test
     fun `asset uri points into the mascot assets folder`() {
         assertEquals("file:///android_asset/mascot/idle.gif", MascotAnimation.IDLE.assetUri)
     }

@@ -20,6 +20,7 @@ enum class CardType {
     FourHamsters,
     TunnelChaos,
     TwoHamsters,
+    CageSwap,
 
     Normal;
 

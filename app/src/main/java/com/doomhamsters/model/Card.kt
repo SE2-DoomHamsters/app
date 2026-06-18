@@ -7,6 +7,7 @@ import org.json.JSONObject
 /** Lists the supported card types used by the game. */
 enum class CardType {
     Doom,
+
     SnackStash,
     PowerNap,
     BegForSnacks,
@@ -15,8 +16,10 @@ enum class CardType {
     SignOfFate,
     SniffAhead,
     StealCard,
-
     HamsterTrio,
+    FourHamsters,
+    TunnelChaos,
+    TwoHamsters,
 
     Normal;
 

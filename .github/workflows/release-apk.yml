@@ -29,11 +29,11 @@ jobs:
 
       - name: Decode keystore and create keystore.properties
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > ${{ github.workspace }}/release.jks
-          echo "storeFile=${{ github.workspace }}/release.jks" > ${{ github.workspace }}/keystore.properties
-          echo "storePassword=$KEY_STORE_PASSWORD" >> ${{ github.workspace }}/keystore.properties
-          echo "keyAlias=$KEY_ALIAS" >> ${{ github.workspace }}/keystore.properties
-          echo "keyPassword=$KEY_PASSWORD" >> ${{ github.workspace }}/keystore.properties
+          echo "$KEYSTORE_BASE64" | base64 --decode > ${{ github.workspace }}/app/release.jks
+          echo "storeFile=${{ github.workspace }}/app/release.jks" > ${{ github.workspace }}/app/keystore.properties
+          echo "storePassword=$KEY_STORE_PASSWORD" >> ${{ github.workspace }}/app/keystore.properties
+          echo "keyAlias=$KEY_ALIAS" >> ${{ github.workspace }}/app/keystore.properties
+          echo "keyPassword=$KEY_PASSWORD" >> ${{ github.workspace }}/app/keystore.properties
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
@@ -43,9 +43,9 @@ jobs:
       - name: Verify keystore.properties
         run: |
           echo "=== keystore.properties content ==="
-          cat ${{ github.workspace }}/keystore.properties
+          cat ${{ github.workspace }}/app/keystore.properties
           echo "=== release.jks size ==="
-          wc -c ${{ github.workspace }}/release.jks
+          wc -c ${{ github.workspace }}/app/release.jks
 
       - name: Build signed release APK
         run: ./gradlew :app:assembleRelease

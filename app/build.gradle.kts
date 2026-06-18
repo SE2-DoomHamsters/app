@@ -9,7 +9,7 @@ plugins {
     id("org.jetbrains.dokka")
 }
 
-val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystorePropertiesFile = project.file("keystore.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) load(keystorePropertiesFile.inputStream())
 }

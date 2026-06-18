@@ -13,6 +13,7 @@ import com.doomhamsters.cards.definitions.PowerNapCardDefinition
 import com.doomhamsters.cards.definitions.QuickPeekCardDefinition
 import com.doomhamsters.cards.definitions.SignOfFateCardDefinition
 import com.doomhamsters.cards.definitions.SnackStashCardDefinition
+import com.doomhamsters.cards.definitions.SquickCardDefinition
 import com.doomhamsters.cards.definitions.StealCardDefinition
 import com.doomhamsters.cards.definitions.SniffAheadCardDefinition
 import com.doomhamsters.cards.definitions.BegForSnacksCardDefinition
@@ -37,6 +38,7 @@ object CardRegistry {
         TunnelChaosCardDefinition,
         StealCardDefinition,
         TwoHamstersCardDefinition,
+        SquickCardDefinition,
         NormalCardDefinition
     )
 

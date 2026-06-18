@@ -13,7 +13,8 @@ enum class CardCommandId {
     SNIFF_AHEAD,
     CAGE_SWAP,
     TUNNEL_CHAOS,
-    STEAL_CARD;
+    STEAL_CARD,
+    SQUICK;
 
 
     companion object {

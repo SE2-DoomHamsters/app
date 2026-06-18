@@ -55,4 +55,16 @@ class CardRegistryTest {
         assertTrue(definition.command.privateResult)
         assertFalse(definition.command.endsTurn)
     }
+    @Test
+    fun `hamster trio is registered as targeted command card`() {
+        val definition = CardRegistry.definitionForType(CardType.HamsterTrio)
+
+        assertEquals("Hamster Trio", definition.displayName)
+        assertEquals(CardCommandId.HAMSTER_TRIO, definition.command?.id)
+        assertTrue(definition.command?.requiresTargetPlayer == true)
+        assertTrue(definition.command?.requiresCardType == true)
+        assertTrue(definition.command?.requiresHamsterType == true)
+        assertFalse(definition.command?.endsTurn == true)
+        assertFalse(definition.command?.privateResult == true)
+    }
 }

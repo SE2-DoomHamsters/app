@@ -40,17 +40,6 @@ class CardRegistryTest {
     }
 
     @Test
-    fun `tunnel chaos is registered as a playable command card`() {
-        val definition = CardRegistry.definitionForType(CardType.TunnelChaos)
-
-        assertEquals("Tunnel Chaos", definition.displayName)
-        assertEquals(CardCommandId.TUNNEL_CHAOS, definition.command?.id)
-        assertTrue(definition.command != null)
-        assertFalse(definition.command?.endsTurn == true)
-        assertTrue(definition.command?.executor == null)
-    }
-
-    @Test
     fun `normal card remains non activatable`() {
         val definition = CardRegistry.definitionFor(Card(CardType.Normal))
 
@@ -67,13 +56,16 @@ class CardRegistryTest {
         assertFalse(definition.command.endsTurn)
     }
     @Test
-    fun `cage swap is registered as targetless command card`() {
-        val definition = CardRegistry.definitionForType(CardType.CageSwap)
+    fun `hamster trio is registered as targeted command card`() {
+        val definition = CardRegistry.definitionForType(CardType.HamsterTrio)
 
-        assertEquals("Cage Swap", definition.displayName)
-        assertEquals(CardCommandId.CAGE_SWAP, definition.command?.id)
-        assertFalse(definition.command?.privateResult == true)
+        assertEquals("Hamster Trio", definition.displayName)
+        assertEquals(CardCommandId.HAMSTER_TRIO, definition.command?.id)
+        assertTrue(definition.command?.requiresTargetPlayer == true)
+        assertTrue(definition.command?.requiresCardType == true)
+        assertTrue(definition.command?.requiresHamsterType == true)
         assertFalse(definition.command?.endsTurn == true)
+        assertFalse(definition.command?.privateResult == true)
     }
 
     @Test

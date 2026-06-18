@@ -12,13 +12,14 @@ enum class CardType {
     BegForSnacks,
     HyperMode,
     QuickPeek,
-    TunnelChaos,
     SignOfFate,
     SniffAhead,
-    CageSwap,
-    FourHamsters,
     StealCard,
+    HamsterTrio,
+    FourHamsters,
+    TunnelChaos,
     TwoHamsters,
+    CageSwap,
     Squick,
     Normal;
 
@@ -38,6 +39,7 @@ enum class CardType {
             "HYPER_MODE", "HYPERMODE" -> HyperMode
             "HAMSTER_FOUR", "HAMSTER4", "HAMSTERTWO" -> FourHamsters
             "HAMSTER_TWO", "HAMSTER2" -> TwoHamsters
+            "HAMSTER_TRIO", "HAMSTERTRIO" -> HamsterTrio
             "SQUICK" -> Squick
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)

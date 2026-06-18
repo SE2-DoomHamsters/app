@@ -11,6 +11,7 @@ enum class CardCommandId {
     HYPER_MODE,
     BEG_FOR_SNACKS,
     SNIFF_AHEAD,
+    HAMSTER_TRIO,
     CAGE_SWAP,
     TUNNEL_CHAOS,
     STEAL_CARD,

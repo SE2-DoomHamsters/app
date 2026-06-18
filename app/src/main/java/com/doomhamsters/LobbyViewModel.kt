@@ -1,7 +1,5 @@
 package com.doomhamsters
 
-
-
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -12,17 +10,12 @@ import androidx.lifecycle.viewModelScope
 import com.doomhamsters.data.GameSession
 import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
+import com.doomhamsters.LobbyConnectionManager
 import com.doomhamsters.model.Status
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import java.util.UUID
 import kotlin.random.Random
 
 /** Owns lobby setup, membership, and game-launch state for the frontend flow. */
@@ -44,6 +37,36 @@ class LobbyViewModel(
     }
 
     private val userId: String = sessionStore.getOrCreateUserId()
+
+    // 1. ZUERST alle StateFlows deklarieren, damit sie bereitstehen...
+    private val _lobby = MutableStateFlow<Lobby?>(null)
+    val lobby: StateFlow<Lobby?> = _lobby
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error: StateFlow<String?> = _error
+
+    private val _infoMessage = MutableStateFlow<String?>(null)
+    val infoMessage: StateFlow<String?> = _infoMessage
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
+    private val _activeGameSession = MutableStateFlow<GameSession?>(null)
+    val activeGameSession: StateFlow<GameSession?> = _activeGameSession
+
+    private val _isConnected = MutableStateFlow(false)
+    val isConnected: StateFlow<Boolean> = _isConnected
+
+    // 2. ERST JETZT den connectionManager instanziieren!
+    private val connectionManager = LobbyConnectionManager(
+        repository = repository,
+        connectionFlow = _isConnected,
+        infoMessageFlow = _infoMessage,
+        enableLobbyRefresh = enableLobbyRefresh,
+        scope = viewModelScope,
+        getCurrentLobby = { _lobby.value },
+        onLobbySnapshot = { applyLobbySnapshot(it) }
+    )
 
     init {
         viewModelScope.launch { tryResumeActiveGame() }
@@ -72,32 +95,13 @@ class LobbyViewModel(
     var isStartingGame by mutableStateOf(false)
         private set
 
-    private val _lobby = MutableStateFlow<Lobby?>(null)
-    val lobby: StateFlow<Lobby?> = _lobby
-
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error
-
-    private val _infoMessage = MutableStateFlow<String?>(null)
-    val infoMessage: StateFlow<String?> = _infoMessage
-
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading
-
-    private val _activeGameSession = MutableStateFlow<GameSession?>(null)
-    val activeGameSession: StateFlow<GameSession?> = _activeGameSession
-
-    private val _isConnected = MutableStateFlow(false)
-    val isConnected: StateFlow<Boolean> = _isConnected
-
-    private var observedLobbyId: String? = null
-    private var lobbyUpdatesJob: Job? = null
-    private var gameStartJob: Job? = null
-    private var lobbyRefreshJob: Job? = null
     private var lastCompletedGameId: String? = null
     private var lastAttemptedAction: (() -> Unit)? = null
     val currentUserId: String
         get() = userId
+
+    val observedLobbyId: String?
+        get() = connectionManager.observedLobbyId
 
     /**
      * Checks whether a previous game session was saved and is still active on the backend.
@@ -120,7 +124,7 @@ class LobbyViewModel(
             return
         }
         sessionStore.loadActiveLobbyId()?.let { savedLobbyId ->
-            observedLobbyId = savedLobbyId
+            connectionManager.observedLobbyId = savedLobbyId
             try {
                 repository.getLobby(savedLobbyId)?.let { lobby -> _lobby.value = lobby }
             } catch (e: Exception) {
@@ -157,7 +161,7 @@ class LobbyViewModel(
                 val createdLobby = repository.createLobby(groupName, user)
                 currentStep = 3
                 applyLobbySnapshot(createdLobby)
-                observeLobby(createdLobby.lobbyId)
+                connectionManager.observeLobby(createdLobby.lobbyId)
             } catch (e: Exception) {
                 _error.value = mapThrowableToMessage(e)
             } finally {
@@ -192,12 +196,12 @@ class LobbyViewModel(
                 Log.d(TAG, "Joining lobby=$normalizedLobbyId as user=$userId name=$username")
                 sessionStore.saveProfile(username = username, avatar = selectedAvatar)
 
-                observeLobby(normalizedLobbyId)
+                connectionManager.observeLobby(normalizedLobbyId)
                 val user = User(userId, username, selectedAvatar)
                 val joinedLobby = repository.joinLobby(normalizedLobbyId, user)
 
                 if (joinedLobby == null) {
-                    clearObservedLobby()
+                    connectionManager.clearObservedLobby()
                     _lobby.value = null
                     isStartingGame = false
                     _error.value = "Lobby '$normalizedLobbyId' wurde nicht gefunden!"
@@ -206,9 +210,9 @@ class LobbyViewModel(
 
                 currentStep = 3
                 applyLobbySnapshot(joinedLobby)
-                observeLobby(joinedLobby.lobbyId)
+                connectionManager.observeLobby(joinedLobby.lobbyId)
             } catch (e: Exception) {
-                clearObservedLobby()
+                connectionManager.clearObservedLobby()
                 _error.value = mapThrowableToMessage(e)
             } finally {
                 isProfileActionInProgress = false
@@ -230,9 +234,9 @@ class LobbyViewModel(
                     repository.leaveLobby(lobbyId, userId)
                 }
             } catch (e: Exception) {
-
+                // Ignored
             } finally {
-                lobbyUpdatesJob?.cancel()
+                connectionManager.lobbyUpdatesJob?.cancel()
                 repository.disconnect()
                 _lobby.value = null
                 currentStep = 1
@@ -281,128 +285,18 @@ class LobbyViewModel(
         sessionStore.clearActiveGame()
         lastCompletedGameId = _activeGameSession.value?.gameId
         _activeGameSession.value = null
-        val lobbyIdToResume = _lobby.value?.lobbyId ?: observedLobbyId
+        val lobbyIdToResume = _lobby.value?.lobbyId ?: connectionManager.observedLobbyId
         if (!lobbyIdToResume.isNullOrBlank()) {
             currentStep = 3
             viewModelScope.launch {
                 try {
-                    observeLobby(lobbyIdToResume)
+                    connectionManager.observeLobby(lobbyIdToResume)
                 } catch (error: Exception) {
                     Log.d(TAG, "Failed to resume lobby observation for $lobbyIdToResume: ${error.message}")
                 }
             }
         } else {
             currentStep = 1
-        }
-    }
-
-    private suspend fun observeLobby(lobbyId: String) {
-        val sameLobby = observedLobbyId == lobbyId
-        val refreshActive = lobbyRefreshJob?.isActive == true
-        val listenersActive = refreshActive &&
-            lobbyUpdatesJob?.isActive == true &&
-            gameStartJob?.isActive == true
-        if (sameLobby && listenersActive) return
-
-        Log.d(TAG, "Observing lobby=$lobbyId")
-        stopLobbyObservers()
-        observedLobbyId = lobbyId
-        if (enableLobbyRefresh) {
-            launchLobbyRefresh(lobbyId)
-        }
-        ensureRealtimeLobbyObservers(lobbyId)
-    }
-
-    private suspend fun ensureRealtimeLobbyObservers(lobbyId: String) {
-        if (lobbyUpdatesJob?.isActive == true && gameStartJob?.isActive == true) {
-            _isConnected.value = repository.isConnected()
-            return
-        }
-        if (!repository.isConnected()) {
-            try {
-                _isConnected.value = false
-                repository.connect()
-                _isConnected.value = true
-            } catch (error: Exception) {
-                Log.d(TAG, "Realtime lobby connection unavailable for $lobbyId: ${error.message}")
-                return
-            }
-        }
-        if (lobbyUpdatesJob?.isActive != true) {
-            launchLobbyUpdates(lobbyId)
-        }
-        if (gameStartJob?.isActive != true) {
-            launchGameStartListener(lobbyId)
-        }
-        _isConnected.value = repository.isConnected()
-    }
-
-    private fun launchLobbyUpdates(lobbyId: String) {
-        lobbyUpdatesJob = viewModelScope.launch {
-            try {
-                repository.subscribeLobbyUpdates(lobbyId)
-                    .catch { error ->
-                        Log.d(TAG, "Lobby updates failed for $lobbyId: ${error.message}")
-                        _infoMessage.value = "Verbindung wird im Hintergrund aktualisiert..."
-                        observedLobbyId = null
-                    }
-                    .collect(::applyLobbySnapshot)
-            } catch (e: Exception) {
-                Log.d(TAG, "Lobby updates setup failed for $lobbyId: ${e.message}")
-                _infoMessage.value = "Verbindung wird im Hintergrund aktualisiert..."
-                observedLobbyId = null
-            }
-        }
-        lobbyUpdatesJob?.invokeOnCompletion { error ->
-            Log.d(
-                TAG,
-                "Lobby updates job completed for lobby=$lobbyId reason=${error?.javaClass?.simpleName ?: "normal"} message=${error?.message}"
-            )
-        }
-    }
-
-    private fun launchGameStartListener(lobbyId: String) {
-        gameStartJob = viewModelScope.launch {
-            repository.subscribeGameStart(lobbyId)
-                .catch { error ->
-                    Log.d(TAG, "Game start listener failed for $lobbyId: ${error.message}")
-                    _infoMessage.value = "Spielstart-Synchronisierung eingeschränkt."
-                    observedLobbyId = null
-                }
-                .collect { newGameId ->
-                    Log.d(TAG, "Received game start for lobby=$lobbyId gameId=$newGameId")
-                    val snapshot = (_lobby.value ?: Lobby(lobbyId = lobbyId)).copy(
-                        gameId = newGameId,
-                        gameStarted = true
-                    )
-                    applyLobbySnapshot(snapshot)
-                }
-        }
-        gameStartJob?.invokeOnCompletion { error ->
-            Log.d(
-                TAG,
-                "Game start job completed for lobby=$lobbyId reason=${error?.javaClass?.simpleName ?: "normal"} message=${error?.message}"
-            )
-        }
-    }
-
-    private fun launchLobbyRefresh(lobbyId: String) {
-        lobbyRefreshJob = viewModelScope.launch {
-            while (isActive) {
-                try {
-                    ensureRealtimeLobbyObservers(lobbyId)
-                    repository.getLobby(lobbyId)?.let(::applyLobbySnapshot)
-                } catch (error: Exception) {
-                    Log.d(TAG, "Lobby refresh failed for $lobbyId: ${error.message}")
-                }
-                delay(1500)
-            }
-        }
-        lobbyRefreshJob?.invokeOnCompletion { error ->
-            Log.d(
-                TAG,
-                "Lobby refresh job completed for lobby=$lobbyId reason=${error?.javaClass?.simpleName ?: "normal"} message=${error?.message}"
-            )
         }
     }
 
@@ -428,49 +322,14 @@ class LobbyViewModel(
         _activeGameSession.value = session
         currentStep = 4
         viewModelScope.launch {
-            pauseLobbyObservationForActiveGame()
+            connectionManager.pauseLobbyObservationForActiveGame()
         }
-    }
-
-    private suspend fun stopLobbyObservers() {
-        Log.d(TAG, "Stopping lobby observers for lobby=$observedLobbyId")
-        lobbyUpdatesJob?.cancelAndJoin()
-        gameStartJob?.cancelAndJoin()
-        lobbyRefreshJob?.cancelAndJoin()
-        clearLobbyObserverRefs()
-    }
-
-    private fun cancelLobbyObservers() {
-        Log.d(TAG, "Cancelling lobby observers for lobby=$observedLobbyId")
-        lobbyUpdatesJob?.cancel()
-        gameStartJob?.cancel()
-        lobbyRefreshJob?.cancel()
-        clearLobbyObserverRefs()
-    }
-
-    private fun clearLobbyObserverRefs() {
-        lobbyUpdatesJob = null
-        gameStartJob = null
-        lobbyRefreshJob = null
-    }
-
-    private suspend fun pauseLobbyObservationForActiveGame() {
-        Log.d(TAG, "Pausing lobby observers for active game lobby=$observedLobbyId")
-        stopLobbyObservers()
-        repository.disconnect()
-        _isConnected.value = false
-    }
-
-    private suspend fun clearObservedLobby() {
-        stopLobbyObservers()
-        observedLobbyId = null
-        _isConnected.value = false
     }
 
     /** Releases lobby observers and network resources when the view model is disposed. */
     override fun onCleared() {
-        Log.d(TAG, "LobbyViewModel.onCleared for lobby=$observedLobbyId user=$userId")
-        cancelLobbyObservers()
+        Log.d(TAG, "LobbyViewModel.onCleared for lobby=${connectionManager.observedLobbyId} user=$userId")
+        connectionManager.cancelLobbyObservers()
         runBlocking {
             repository.disconnect()
         }

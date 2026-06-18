@@ -33,6 +33,7 @@ data class LocalPlayerAreaInputs(
     val pendingDoomRequiresSelection: Boolean,
     val isResolvingLocalDoom: Boolean,
     val isLifeLossDoomOverlay: Boolean,
+    val isSnackStashClaimPending: Boolean,
     val localAnimatingCardIndex: Int,
     val localDrawStartOffset: Offset?,
     val drawProgress: Float
@@ -57,7 +58,7 @@ fun buildLocalPlayerAreaContent(
             selectedIndex = inputs.selectedPlayerCardIndex,
             disableDefocus = inputs.pendingDoomRequiresSelection,
             suppressTooltip = inputs.isResolvingLocalDoom,
-            interactionEnabled = !inputs.isLifeLossDoomOverlay,
+            interactionEnabled = !inputs.isLifeLossDoomOverlay && !inputs.isSnackStashClaimPending,
             onCenterMeasured = callbacks.onHandCenterMeasured
         ),
         handAnimationConfig = FannedHandAnimationConfig(

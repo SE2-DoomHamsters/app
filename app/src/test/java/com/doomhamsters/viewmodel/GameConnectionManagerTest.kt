@@ -1,5 +1,4 @@
 package com.doomhamsters.viewmodel
-
 import com.doomhamsters.GameRepository
 import com.doomhamsters.model.GameState
 import com.doomhamsters.model.Player
@@ -14,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -25,10 +25,8 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.io.IOException
-
 @OptIn(ExperimentalCoroutinesApi::class)
-class GameBoardViewModelReconnectTest {
-
+class GameConnectionManagerTest {
     private val testDispatcher = UnconfinedTestDispatcher()
     private lateinit var repository: GameRepository
     private val createdViewModels = mutableListOf<GameBoardViewModel>()
@@ -59,25 +57,42 @@ class GameBoardViewModelReconnectTest {
 
         assertEquals(ConnectionStatus.Connected, vm.connectionStatus.value)
     }
+        @Test
+        fun `status is Reconnecting after a subscription failure`() = runTest {
+            coEvery { repository.subscribeToGameState(any()) } returns flow {
+                throw IOException("dropped")
+            }
+            val connectBarrier = CompletableDeferred<Unit>()
+            var connectCount = 0
+            coEvery { repository.connect() } coAnswers {
+                connectCount++
+                if (connectCount > 1) connectBarrier.await()
+            }
 
-    @Test
-    fun `status is Reconnecting after a subscription failure`() = runTest {
-        coEvery { repository.subscribeToGameState(any()) } returns flow {
-            throw IOException("dropped")
+            val manager = GameConnectionManager("game-1", repository)
+
+            val job = launch {
+                manager.connectAndMaintain(
+                    localPlayerId = "player-1",
+                    localPlayerName = "Astrobot",
+                    onInitialConnect = {},
+                    onReconnect = {},
+                    onGameStateReceived = {},
+                    onPublicEventReceived = {},
+                    onPrivateEventReceived = {},
+                    onServerError = {},
+                    onFatalError = {},
+                    onLog = {}
+                )
+            }
+
+            advanceUntilIdle()
+
+            assertEquals(ConnectionStatus.Reconnecting(1, 3), manager.connectionStatus.value)
+            connectBarrier.complete(Unit)
+            job.cancel()
         }
-        val connectBarrier = CompletableDeferred<Unit>()
-        var connectCount = 0
-        coEvery { repository.connect() } coAnswers {
-            connectCount++
-            if (connectCount > 1) connectBarrier.await()
-        }
 
-        val vm = createViewModel()
-        advanceUntilIdle()
-
-        assertEquals(ConnectionStatus.Reconnecting(1, 3), vm.connectionStatus.value)
-        connectBarrier.complete(Unit)
-    }
 
     @Test
     fun `status returns to Connected after a successful reconnect`() = runTest {
@@ -123,6 +138,7 @@ class GameBoardViewModelReconnectTest {
         coEvery { repository.subscribeToGameState(any()) } returns flow {
             throw IOException("dropped")
         }
+
         val secondReconnectBarrier = CompletableDeferred<Unit>()
         var connectCount = 0
         coEvery { repository.connect() } coAnswers {
@@ -134,11 +150,27 @@ class GameBoardViewModelReconnectTest {
             }
         }
 
-        val vm = createViewModel()
-        advanceUntilIdle()
+        val manager = GameConnectionManager("game-1", repository)
 
-        assertEquals(ConnectionStatus.Reconnecting(2, 3), vm.connectionStatus.value)
+        val job = launch {
+            manager.connectAndMaintain(
+                localPlayerId = "player-1",
+                localPlayerName = "Astrobot",
+                onInitialConnect = {},
+                onReconnect = {},
+                onGameStateReceived = {},
+                onPublicEventReceived = {},
+                onPrivateEventReceived = {},
+                onServerError = {},
+                onFatalError = {},
+                onLog = {}
+            )
+        }
+
+        advanceUntilIdle()
+        assertEquals(ConnectionStatus.Reconnecting(2, 3), manager.connectionStatus.value)
         secondReconnectBarrier.complete(Unit)
+        job.cancel()
     }
 
     @Test
@@ -209,6 +241,36 @@ class GameBoardViewModelReconnectTest {
 
         assertTrue(vm.log.value.contains("Reconnected."))
     }
+    @Test
+    fun `retries initial connection before surfacing failure`() = runTest {
+
+        coEvery { repository.connect() } throws RuntimeException("timeout") andThen Unit
+        coEvery { repository.disconnect() } just Runs
+
+
+        val manager = GameConnectionManager("game-1", repository)
+
+
+        val job = launch {
+            manager.connectAndMaintain(
+                localPlayerId = "player-1",
+                localPlayerName = "Alex",
+                onInitialConnect = {},
+                onReconnect = {},
+                onGameStateReceived = {},
+                onPublicEventReceived = {},
+                onPrivateEventReceived = {},
+                onServerError = {},
+                onFatalError = {},
+                onLog = {}
+            )
+        }
+
+        advanceUntilIdle()
+        coVerify(exactly = 2) { repository.connect() }
+        coVerify(exactly = 1) { repository.disconnect() }
+        job.cancel()
+    }
 
     private fun defaultGameState() = GameState(
         id = "game-1",
@@ -239,4 +301,5 @@ class GameBoardViewModelReconnectTest {
             .apply { isAccessible = true }
             .invoke(viewModel)
     }
+
 }

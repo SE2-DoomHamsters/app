@@ -8,6 +8,7 @@ import com.doomhamsters.model.CardType
 import com.doomhamsters.model.GameState
 import com.doomhamsters.model.Player
 import com.doomhamsters.model.Status
+import com.doomhamsters.cheating.SnackStashClaimEvent
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -88,21 +89,21 @@ class GameBoardViewModelStateSyncTest {
     }
 
     @Test
-    fun `doom draw event is informational because backend resolves doom automatically`() = runTest {
+    fun `doom draw prompts local player to claim a selected card as snack stash`() = runTest {
         val localPlayerId = "player-1"
         val privateEventFlow = MutableSharedFlow<JSONObject>()
+        val snackStash = Card(CardType.SnackStash, id = "s1")
         val initialState = gameState(
             currentPlayerId = localPlayerId,
-            localHand = listOf(Card(CardType.SnackStash, id = "s1")),
+            localHand = listOf(snackStash),
             localHandSizeHint = 1
         )
-        val afterDefuseState = gameState(
+        val resolvingState = gameState(
             currentPlayerId = localPlayerId,
             localHand = emptyList(),
-            localHandSizeHint = 0,
+            localHandSizeHint = 1,
             resolvingDoomPlayerId = localPlayerId,
-            pendingDoomRequiresInsertion = true,
-            pendingDoomCardId = "doom-1"
+            pendingDoomRequiresInsertion = false
         )
         val doomEvent = org.json.JSONObject()
             .put("type", "DOOM_DRAWN")
@@ -121,23 +122,32 @@ class GameBoardViewModelStateSyncTest {
         )
         advanceUntilIdle()
         privateEventFlow.emit(doomEvent)
-        gameStateFlow.emit(afterDefuseState)
+        gameStateFlow.emit(resolvingState)
         advanceUntilIdle()
 
         assertEquals(CardType.Doom, viewModel.pendingDoom.value?.type)
-        assertEquals("Scroll to your Snack Stash and select it.", viewModel.pendingDoomMessage.value)
+        assertEquals("Use Snack Stash, bluff with another card, or accept Doom.", viewModel.pendingDoomMessage.value)
         assertEquals(true, viewModel.pendingDoomRequiresSelection.value)
         assertEquals(false, viewModel.pendingDoomRequiresInsertionUi.value)
         assertEquals(1, viewModel.gameState.value!!.players.first { it.id == localPlayerId }.hand.size)
         assertEquals(CardType.SnackStash, viewModel.gameState.value!!.players.first { it.id == localPlayerId }.hand.first().type)
         assertEquals("You drew a Doom card.", viewModel.log.value.last())
 
-        viewModel.dismissDoomNotice(0)
+        viewModel.snackStash.claim(snackStash)
         advanceUntilIdle()
 
+        coVerify {
+            repository.sendAction(
+                "game-1",
+                "snack-stash/claim",
+                match {
+                    it.optString("playerId") == localPlayerId &&
+                        it.optString("cardId") == "s1"
+                }
+            )
+        }
         assertEquals(false, viewModel.pendingDoomRequiresSelection.value)
-        assertEquals(true, viewModel.pendingDoomRequiresInsertionUi.value)
-        assertEquals(0, viewModel.gameState.value!!.players.first { it.id == localPlayerId }.hand.size)
+        assertEquals("Waiting for votes.", viewModel.pendingDoomMessage.value)
         coVerify(exactly = 0) { repository.sendAction("game-1", "doom/ack", any()) }
     }
 
@@ -152,10 +162,9 @@ class GameBoardViewModelStateSyncTest {
         val resolvingState = gameState(
             currentPlayerId = localPlayerId,
             localHand = emptyList(),
-            localHandSizeHint = 0,
+            localHandSizeHint = 1,
             resolvingDoomPlayerId = localPlayerId,
-            pendingDoomRequiresInsertion = true,
-            pendingDoomCardId = "doom-1"
+            pendingDoomRequiresInsertion = false
         )
         val doomEvent = org.json.JSONObject()
             .put("type", "DOOM_DRAWN")
@@ -184,7 +193,7 @@ class GameBoardViewModelStateSyncTest {
     }
 
     @Test
-    fun `doom draw without snack stash logs life loss and does not create pending state`() = runTest {
+    fun `doom draw without cards waits for explicit doom acceptance`() = runTest {
         val localPlayerId = "player-1"
         val initialState = gameState(
             currentPlayerId = localPlayerId,
@@ -196,12 +205,20 @@ class GameBoardViewModelStateSyncTest {
             currentPlayerId = localPlayerId,
             localHand = emptyList(),
             localHandSizeHint = 0,
-            localLives = 2,
+            localLives = 3,
             resolvingDoomPlayerId = localPlayerId
+        )
+        val afterAcceptState = gameState(
+            currentPlayerId = localPlayerId,
+            localHand = emptyList(),
+            localHandSizeHint = 0,
+            localLives = 2,
+            resolvingDoomPlayerId = null
         )
 
         coEvery { repository.connect() } just Runs
-        coEvery { repository.fetchGameState("game-1", localPlayerId) } returnsMany listOf(initialState, afterDoomState)
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returnsMany
+            listOf(initialState, afterDoomState, afterAcceptState, afterAcceptState)
         coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
         coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns flowOf(
             org.json.JSONObject()
@@ -221,15 +238,15 @@ class GameBoardViewModelStateSyncTest {
         advanceUntilIdle()
 
         assertEquals(CardType.Doom, viewModel.pendingDoom.value?.type)
-        assertEquals("You lost 1 life.", viewModel.pendingDoomMessage.value)
-        assertEquals(false, viewModel.pendingDoomRequiresSelection.value)
+        assertEquals("Use Snack Stash, bluff with another card, or accept Doom.", viewModel.pendingDoomMessage.value)
+        assertEquals(true, viewModel.pendingDoomRequiresSelection.value)
         assertEquals(false, viewModel.pendingDoomRequiresInsertionUi.value)
-        assertEquals(2, viewModel.gameState.value!!.players.first { it.id == localPlayerId }.lives)
-        assertEquals("You drew a Doom card and lost 1 life.", viewModel.log.value.last())
+        assertEquals(3, viewModel.gameState.value!!.players.first { it.id == localPlayerId }.lives)
+        assertEquals("You drew a Doom card.", viewModel.log.value.last())
         coVerify(exactly = 0) { repository.sendAction("game-1", "nextTurn", any()) }
         coVerify(exactly = 0) { repository.sendAction("game-1", "doom/ack", any()) }
 
-        viewModel.dismissDoomNotice()
+        viewModel.snackStash.acceptDoom()
         advanceUntilIdle()
 
         coVerify(exactly = 1) { repository.sendAction("game-1", "doom/ack", any()) }
@@ -274,8 +291,6 @@ class GameBoardViewModelStateSyncTest {
         gameStateFlow.emit(resolvingState)
         advanceUntilIdle()
 
-        viewModel.dismissDoomNotice(0)
-        advanceUntilIdle()
         viewModel.insertDoom(3)
         advanceUntilIdle()
 
@@ -345,9 +360,9 @@ class GameBoardViewModelStateSyncTest {
 
         gameStateFlow.emit(remoteLifeLossState)
         advanceUntilIdle()
-        assertEquals("Remote was hit by Doom.", viewModel.pausedForDoomMessage.value)
+        assertEquals("Remote drew Doom.", viewModel.pausedForDoomMessage.value)
         assertEquals(
-            "They are acknowledging the life loss before play continues.",
+            "They can claim Snack Stash or accept the hit.",
             viewModel.pausedForDoomDetail.value
         )
 
@@ -390,9 +405,9 @@ class GameBoardViewModelStateSyncTest {
         advanceUntilIdle()
 
         assertEquals("Remote", viewModel.pausedForDoomPlayerName.value)
-        assertEquals("Remote was hit by Doom.", viewModel.pausedForDoomMessage.value)
+        assertEquals("Remote drew Doom.", viewModel.pausedForDoomMessage.value)
         assertEquals(
-            "They are acknowledging the life loss before play continues.",
+            "They can claim Snack Stash or accept the hit.",
             viewModel.pausedForDoomDetail.value
         )
     }
@@ -540,6 +555,118 @@ class GameBoardViewModelStateSyncTest {
         assertEquals(CardType.Doom, viewModel.cardCommandNotice.value?.revealedCard?.type)
     }
 
+    @Test
+    fun `snack stash vote sends vote command and marks local player as voted`() = runTest {
+        val localPlayerId = "player-1"
+        val publicEventFlow = MutableSharedFlow<String>()
+        val initialState = gameState(
+            currentPlayerId = "player-2",
+            localHand = emptyList(),
+            localHandSizeHint = 0
+        )
+        val afterVoteState = gameState(
+            currentPlayerId = "player-2",
+            localHand = emptyList(),
+            localHandSizeHint = 0,
+            resolvingDoomPlayerId = "player-2",
+            pendingSnackStashClaim = SnackStashClaimEvent(
+                claimId = "claim-1",
+                playerId = "player-2",
+                playerName = "Remote",
+                votesRequired = 2,
+                votesReceived = 1,
+                votedPlayerIds = setOf(localPlayerId),
+                message = "Remote claims Snack Stash."
+            )
+        )
+        val claimEvent = JSONObject()
+            .put("type", "SNACK_STASH_CLAIM_PENDING")
+            .put("claimId", "claim-1")
+            .put("playerId", "player-2")
+            .put("playerName", "Remote")
+            .put("votesRequired", 1)
+            .put("votesReceived", 0)
+            .put("votedPlayerIds", org.json.JSONArray())
+            .put("message", "Remote claims Snack Stash.")
+
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returnsMany
+            listOf(initialState, afterVoteState)
+        coEvery { repository.subscribeToGame("game-1") } returns publicEventFlow
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+        coEvery { repository.sendAction(any(), any(), any()) } just Runs
+
+        val viewModel = createViewModel(
+            gameId = "game-1",
+            initialLocalPlayerId = localPlayerId,
+            localPlayerName = "Local",
+            repository = repository
+        )
+        advanceUntilIdle()
+        publicEventFlow.emit(claimEvent.toString())
+        advanceUntilIdle()
+
+        viewModel.snackStash.vote("claim-1", challenge = true)
+        advanceUntilIdle()
+
+        coVerify {
+            repository.sendAction(
+                "game-1",
+                "snack-stash/vote",
+                match {
+                        it.optString("playerId") == localPlayerId &&
+                        it.optString("claimId") == "claim-1" &&
+                        it.optString("vote") == "NO"
+                }
+            )
+        }
+        assertEquals(
+            true,
+            viewModel.snackStash.pendingClaim.value?.votedPlayerIds?.contains(localPlayerId)
+        )
+    }
+
+    @Test
+    fun `pending snack stash claim is restored from fetched game state`() = runTest {
+        val localPlayerId = "player-1"
+        val pendingClaim = SnackStashClaimEvent(
+            claimId = "claim-1",
+            playerId = "player-2",
+            playerName = "Remote",
+            votesRequired = 1,
+            votesReceived = 0,
+            votedPlayerIds = emptySet(),
+            message = "Remote claims Snack Stash."
+        )
+        val initialState = gameState(
+            currentPlayerId = "player-2",
+            localHand = emptyList(),
+            localHandSizeHint = 0,
+            resolvingDoomPlayerId = "player-2",
+            pendingSnackStashClaim = pendingClaim
+        )
+
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returns initialState
+        coEvery { repository.subscribeToGame("game-1") } returns emptyFlow()
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+
+        val viewModel = createViewModel(
+            gameId = "game-1",
+            initialLocalPlayerId = localPlayerId,
+            localPlayerName = "Local",
+            repository = repository
+        )
+        advanceUntilIdle()
+
+        assertEquals("claim-1", viewModel.snackStash.pendingClaim.value?.claimId)
+        assertEquals("player-2", viewModel.snackStash.pendingClaim.value?.playerId)
+        assertEquals(0, viewModel.snackStash.pendingClaim.value?.votesReceived)
+        assertEquals("Remote", viewModel.pausedForDoomPlayerName.value)
+    }
+
     private fun gameState(
         currentPlayerId: String,
         localHand: List<Card>,
@@ -549,7 +676,8 @@ class GameBoardViewModelStateSyncTest {
         resolvingDoomPlayerId: String? = null,
         pendingDoomRequiresInsertion: Boolean = false,
         pendingDoomCardId: String? = null,
-        remainingDeckSize: Int = 30
+        remainingDeckSize: Int = 30,
+        pendingSnackStashClaim: SnackStashClaimEvent? = null
     ): GameState {
         val localPlayer = Player(
             id = "player-1",
@@ -576,7 +704,8 @@ class GameBoardViewModelStateSyncTest {
             remainingDeckSize = remainingDeckSize,
             resolvingDoomPlayerId = resolvingDoomPlayerId,
             pendingDoomRequiresInsertion = pendingDoomRequiresInsertion,
-            pendingDoomCardId = pendingDoomCardId
+            pendingDoomCardId = pendingDoomCardId,
+            pendingSnackStashClaim = pendingSnackStashClaim
         )
     }@Test
     fun `steal card activates target selection dialog without sending action`() = runTest {

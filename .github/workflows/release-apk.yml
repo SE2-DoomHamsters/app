@@ -29,7 +29,12 @@ jobs:
 
       - name: Decode keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/app/release.jks
+          echo "Secret length: ${#KEYSTORE_BASE64}"
+          echo "$KEYSTORE_BASE64" | base64 --decode > ${{ github.workspace }}/app/release.jks
+          echo "File size: $(wc -c < ${{ github.workspace }}/app/release.jks) bytes"
+          ls -la ${{ github.workspace }}/app/release.jks
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
 
       - name: Build signed release APK
         run: ./gradlew :app:assembleRelease

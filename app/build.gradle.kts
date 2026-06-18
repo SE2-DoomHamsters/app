@@ -151,6 +151,8 @@ dependencies {
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.ui)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.gif)
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation(libs.androidx.compose.foundation)
     testImplementation(platform(libs.junit.bom))

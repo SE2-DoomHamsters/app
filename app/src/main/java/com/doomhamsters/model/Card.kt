@@ -15,6 +15,9 @@ enum class CardType {
     SignOfFate,
     SniffAhead,
     StealCard,
+
+    HamsterTrio,
+
     Normal;
 
     companion object {
@@ -30,6 +33,7 @@ enum class CardType {
             "STEAL_CARD", "STEALCARD" -> StealCard
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "HYPER_MODE", "HYPERMODE" -> HyperMode
+            "HAMSTER_TRIO", "HAMSTERTRIO" -> HamsterTrio
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)
         }

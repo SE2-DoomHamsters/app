@@ -8,7 +8,7 @@ import com.doomhamsters.model.CardType
 
 /** Defines the Hamster Trio combo and its targeted named-card-take behavior. */
 object HamsterTrioCardDefinition : CardDefinition {
-    override val type: CardType = CardType.Normal  // virtual combo; no single card type
+    override val type: CardType = CardType.HamsterTrio  // virtual combo; no single card type
     override val displayName: String = "Hamster Trio"
     override val description: String =
         "Play three identical Hamster cards to take a named card from another player."
@@ -17,7 +17,7 @@ object HamsterTrioCardDefinition : CardDefinition {
         requiresTargetPlayer = true,
         requiresCardType = true,
         requiresHamsterType = true,
-        executor = HamsterTrioCommand
+        executor = null
     )
 
     private object HamsterTrioCommand : CardCommand {

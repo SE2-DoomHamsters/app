@@ -17,6 +17,7 @@ import com.doomhamsters.model.GameState
 import com.doomhamsters.model.Status
 import com.doomhamsters.cheating.SnackStashUiEffect
 import com.doomhamsters.cheating.SnackStashViewModelFeature
+import com.doomhamsters.mascot.MascotViewModelFeature
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -84,10 +85,22 @@ open class GameBoardViewModel(
 
     private val _cardCommandNotice = MutableStateFlow<CardCommandNotice?>(null)
     val cardCommandNotice: StateFlow<CardCommandNotice?> = _cardCommandNotice
+
+    // Emits whenever the local player plays any card (every CARD_COMMAND_PLAYED),
+    // not just the ones that produce a UI notice.
+    private val _cardPlayed = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val cardPlayed: SharedFlow<Unit> = _cardPlayed
     private val _showTargetSelectionDialog = MutableStateFlow(false)
     val showTargetSelectionDialog: StateFlow<Boolean> = _showTargetSelectionDialog
     private val _selectedCardForActivation = MutableStateFlow<Card?>(null)
     val selectedCardForActivation: StateFlow<Card?> = _selectedCardForActivation
+    val mascot = MascotViewModelFeature(
+        scope = viewModelScope,
+        isLocalPlayersTurn = isLocalPlayersTurn,
+        pendingDoom = pendingDoom,
+        cardPlayed = cardPlayed,
+        connectionStatus = connectionStatus
+    )
     val snackStash = SnackStashViewModelFeature(
         gameId = gameId,
         localPlayerId = { localPlayerId },
@@ -190,6 +203,10 @@ open class GameBoardViewModel(
 
         val parsedEvent = CardCommandEvent.fromJsonOrNull(event) ?: return
         if (parsedEvent.type != CardCommandEventType.CARD_COMMAND_PLAYED) return
+
+        if (parsedEvent.playerId == localPlayerId) {
+            _cardPlayed.tryEmit(Unit)
+        }
 
         val message = parsedEvent.message ?: buildString {
             append(parsedEvent.playerName ?: "A player")

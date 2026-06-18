@@ -40,6 +40,13 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
+      - name: Verify keystore.properties
+        run: |
+          echo "=== keystore.properties content ==="
+          cat ${{ github.workspace }}/keystore.properties
+          echo "=== release.jks size ==="
+          wc -c ${{ github.workspace }}/release.jks
+
       - name: Build signed release APK
         run: ./gradlew :app:assembleRelease
 

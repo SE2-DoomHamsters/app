@@ -14,7 +14,8 @@ enum class CardCommandId {
     HAMSTER_TRIO,
     CAGE_SWAP,
     TUNNEL_CHAOS,
-    STEAL_CARD;
+    STEAL_CARD,
+    SQUICK;
 
 
     companion object {

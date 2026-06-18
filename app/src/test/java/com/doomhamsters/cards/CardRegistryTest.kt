@@ -67,4 +67,16 @@ class CardRegistryTest {
         assertFalse(definition.command?.endsTurn == true)
         assertFalse(definition.command?.privateResult == true)
     }
+
+    @Test
+    fun `squick is registered as a no-target no-private command card`() {
+        val definition = CardRegistry.definitionForType(CardType.Squick)
+
+        assertEquals("Squick", definition.displayName)
+        assertEquals(CardCommandId.SQUICK, definition.command?.id)
+        assertFalse(definition.command?.privateResult == true)
+        assertFalse(definition.command?.endsTurn == true)
+        assertFalse(definition.command?.requiresTargetPlayer == true)
+        assertTrue(definition.command?.executor == null)
+    }
 }

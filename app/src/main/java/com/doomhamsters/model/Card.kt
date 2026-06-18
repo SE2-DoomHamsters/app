@@ -7,7 +7,6 @@ import org.json.JSONObject
 /** Lists the supported card types used by the game. */
 enum class CardType {
     Doom,
-
     SnackStash,
     PowerNap,
     BegForSnacks,
@@ -21,7 +20,7 @@ enum class CardType {
     TunnelChaos,
     TwoHamsters,
     CageSwap,
-
+    Squick,
     Normal;
 
     companion object {
@@ -35,9 +34,11 @@ enum class CardType {
             "SNIFF_AHEAD", "SNIFFAHEAD" -> SniffAhead
             "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "STEAL_CARD", "STEALCARD" -> StealCard
-            "BEG_FOR_SNACKS", "BEGFORSNACKS" -> BegForSnacks
             "HYPER_MODE", "HYPERMODE" -> HyperMode
             "HAMSTER_TRIO", "HAMSTERTRIO" -> HamsterTrio
+            "HAMSTER_FOUR", "HAMSTER4", "HAMSTERTWO" -> FourHamsters
+            "HAMSTER_TWO", "HAMSTER2" -> TwoHamsters
+            "SQUICK" -> Squick
             "NORMAL" -> Normal
             else -> runCatching { valueOf(value) }.getOrDefault(Normal)
         }

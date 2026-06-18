@@ -1,5 +1,3 @@
-import java.util.Properties
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -9,24 +7,23 @@ plugins {
     id("org.jetbrains.dokka")
 }
 
-val keystorePropertiesFile = project.file("keystore.properties")
-val keystoreProperties = Properties().apply {
-    if (keystorePropertiesFile.exists()) load(keystorePropertiesFile.inputStream())
-}
-println("==> keystore file path: ${keystorePropertiesFile.absolutePath}")
-println("==> keystore file exists: ${keystorePropertiesFile.exists()}")
+val signingStoreFile   = System.getenv("SIGNING_STORE_FILE")
+val signingPassword    = System.getenv("SIGNING_STORE_PASSWORD")
+val signingKeyAlias    = System.getenv("SIGNING_KEY_ALIAS")
+val signingKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+val canSign = listOf(signingStoreFile, signingPassword, signingKeyAlias, signingKeyPassword).all { it != null }
 
 android {
     namespace = "com.doomhamsters"
     compileSdk=36
 
-    if (keystorePropertiesFile.exists()) {
+    if (canSign) {
         signingConfigs {
             create("release") {
-                storeFile = file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile     = file(signingStoreFile!!)
+                storePassword = signingPassword
+                keyAlias      = signingKeyAlias
+                keyPassword   = signingKeyPassword
             }
         }
     }
@@ -43,7 +40,7 @@ android {
 
     buildTypes {
         release {
-            if (keystorePropertiesFile.exists()) signingConfig = signingConfigs.getByName("release")
+            if (canSign) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

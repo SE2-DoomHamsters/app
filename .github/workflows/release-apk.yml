@@ -29,12 +29,12 @@ jobs:
 
       - name: Decode keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/release.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > ${{ github.workspace }}/app/release.jks
 
       - name: Build signed release APK
         run: ./gradlew :app:assembleRelease
         env:
-          KEY_STORE_FILE: release.jks
+          KEY_STORE_FILE: ${{ github.workspace }}/app/release.jks
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}

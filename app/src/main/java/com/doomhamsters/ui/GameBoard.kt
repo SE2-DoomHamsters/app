@@ -5,6 +5,7 @@ import com.doomhamsters.ui.cheating.SnackStashClaimDialogHost
 import com.doomhamsters.cheating.presentation.SnackStashClaimConfirmationDialogPresentation
 import com.doomhamsters.cheating.presentation.SnackStashHandSelectionState
 import com.doomhamsters.cheating.presentation.SnackStashNoticeOverlayPresentation
+import com.doomhamsters.ui.mascot.BoardMascot
 import com.doomhamsters.ui.theme.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -35,6 +36,7 @@ fun GameBoard(
     onLeaveGame: () -> Unit = {}
 ) {
     val showTargetSelectionDialog by viewModel.showTargetSelectionDialog.collectAsState()
+    val mascotAnimation by viewModel.mascot.animation.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val gameState = uiState.gameState
     val isLocalPlayersTurn = uiState.isLocalPlayersTurn
@@ -343,6 +345,15 @@ fun GameBoard(
                     state = snackStashClaimDialogState,
                     onClaimCard = viewModel.snackStash::claim,
                     onClose = ::clearSnackStashHandSelection
+                )
+
+                BoardMascot(
+                    animation = mascotAnimation,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 12.dp, bottom = 96.dp)
+                        .size(200.dp)
+                        .zIndex(0f) // behind the player's hand cards (declared before PlayerArea)
                 )
 
                 Box(

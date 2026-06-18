@@ -1,6 +1,8 @@
 package com.doomhamsters.model
 import org.json.JSONArray
 import org.json.JSONObject
+import com.doomhamsters.cheating.SnackStashClaimEvent
+import com.doomhamsters.cheating.SnackStashEventJson
 
 /** Describes the current lifecycle state of a game. */
 enum class Status {
@@ -32,7 +34,8 @@ data class GameState(
     val remainingDeckSize: Int = 0,
     val resolvingDoomPlayerId: String? = null,
     val pendingDoomRequiresInsertion: Boolean = false,
-    val pendingDoomCardId: String? = null
+    val pendingDoomCardId: String? = null,
+    val pendingSnackStashClaim: SnackStashClaimEvent? = null
 )  {
     val deckSize: Int
         get() = remainingDeckSize.takeIf { it >= 0 } ?: deck.size()
@@ -55,6 +58,7 @@ data class GameState(
             resolvingDoomPlayerId?.let { put("resolvingDoomPlayerId", it) }
             put("pendingDoomRequiresInsertion", pendingDoomRequiresInsertion)
             pendingDoomCardId?.let { put("pendingDoomCardId", it) }
+            pendingSnackStashClaim?.let { put("pendingSnackStashClaim", SnackStashEventJson.claimToJson(it)) }
         }
     }
 
@@ -88,7 +92,8 @@ data class GameState(
                 remainingDeckSize = json.optInt("remainingDeckSize", parsedDeck.size()),
                 resolvingDoomPlayerId = json.optNullableString("resolvingDoomPlayerId"),
                 pendingDoomRequiresInsertion = json.optBoolean("pendingDoomRequiresInsertion"),
-                pendingDoomCardId = json.optNullableString("pendingDoomCardId")
+                pendingDoomCardId = json.optNullableString("pendingDoomCardId"),
+                pendingSnackStashClaim = json.optSnackStashClaim()
             )
         }
 
@@ -114,8 +119,14 @@ data class GameState(
                 remainingDeckSize = json.optInt("remainingDeckSize"),
                 resolvingDoomPlayerId = json.optNullableString("resolvingDoomPlayerId"),
                 pendingDoomRequiresInsertion = json.optBoolean("pendingDoomRequiresInsertion"),
-                pendingDoomCardId = json.optNullableString("pendingDoomCardId")
+                pendingDoomCardId = json.optNullableString("pendingDoomCardId"),
+                pendingSnackStashClaim = json.optSnackStashClaim()
             )
+        }
+
+        private fun JSONObject.optSnackStashClaim(): SnackStashClaimEvent? {
+            val claimJson = optJSONObject("pendingSnackStashClaim") ?: return null
+            return SnackStashEventJson.claimFromJsonOrNull(claimJson)
         }
     }
 }

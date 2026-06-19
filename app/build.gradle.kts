@@ -7,9 +7,26 @@ plugins {
     id("org.jetbrains.dokka")
 }
 
+val signingStoreFile   = System.getenv("SIGNING_STORE_FILE")
+val signingPassword    = System.getenv("SIGNING_STORE_PASSWORD")
+val signingKeyAlias    = System.getenv("SIGNING_KEY_ALIAS")
+val signingKeyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+val canSign = listOf(signingStoreFile, signingPassword, signingKeyAlias, signingKeyPassword).all { it != null }
+
 android {
     namespace = "com.doomhamsters"
     compileSdk=36
+
+    if (canSign) {
+        signingConfigs {
+            create("release") {
+                storeFile     = file(signingStoreFile!!)
+                storePassword = signingPassword
+                keyAlias      = signingKeyAlias
+                keyPassword   = signingKeyPassword
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.doomhamsters"
@@ -23,6 +40,7 @@ android {
 
     buildTypes {
         release {
+            if (canSign) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

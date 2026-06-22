@@ -10,6 +10,7 @@ import kotlinx.coroutines.test.runTest
 import org.hildan.krossbow.stomp.StompClient
 import org.hildan.krossbow.stomp.StompSession
 import org.json.JSONObject
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -77,5 +78,34 @@ class GameRepositoryTest {
         assertThrows<IllegalStateException> {
             repository.sendAction("GAME-1", "draw", payload)
         }
+    }
+
+    @Test
+    fun `parseErrorMessageOrNull returns message for valid payload`() {
+        val message = repository.parseErrorMessageOrNull("{\"message\":\"Not your turn\"}")
+
+        assertEquals("Not your turn", message)
+    }
+
+    @Test
+    fun `parseErrorMessageOrNull drops malformed payload`() {
+        assertNull(repository.parseErrorMessageOrNull("not json"))
+    }
+
+    @Test
+    fun `parsePrivateEventOrNull parses valid payload`() {
+        val event = repository.parsePrivateEventOrNull("{\"type\":\"DOOM_DRAWN\"}")
+
+        assertEquals("DOOM_DRAWN", event?.optString("type"))
+    }
+
+    @Test
+    fun `parsePrivateEventOrNull drops malformed payload`() {
+        assertNull(repository.parsePrivateEventOrNull("{not valid"))
+    }
+
+    @Test
+    fun `parseGameStateOrNull drops malformed payload`() {
+        assertNull(repository.parseGameStateOrNull("garbage"))
     }
 }

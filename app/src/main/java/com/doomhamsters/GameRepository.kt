@@ -5,7 +5,7 @@ import android.util.Log
 import com.doomhamsters.model.GameState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -57,9 +57,9 @@ class GameRepository(
     suspend fun subscribeToGameState(gameId: String): Flow<GameState> =
         requireSession()
             .subscribeText("/topic/game-state/$gameId")
-            .map { payload ->
+            .mapNotNull { payload ->
                 Log.d(tag, "WS game-state raw gameId=$gameId payload=$payload")
-                GameState.fromJson(JSONObject(payload)).also { state ->
+                parseGameStateOrNull(payload)?.also { state ->
                     Log.d(
                         tag,
                         "WS game-state parsed gameId=$gameId currentPlayerId=${state.currentTurnPlayerId} turnCount=${state.turnCount} status=${state.status}"
@@ -71,10 +71,37 @@ class GameRepository(
     suspend fun subscribeToPrivateEvents(gameId: String, playerId: String): Flow<JSONObject> =
         requireSession()
             .subscribeText("/queue/game/$gameId/$playerId")
-            .map { payload ->
+            .mapNotNull { payload ->
                 Log.d(tag, "WS private-event gameId=$gameId playerId=$playerId payload=$payload")
-                JSONObject(payload)
+                parsePrivateEventOrNull(payload)
             }
+
+    /** Subscribes to player-specific error events for rejected or failed actions. */
+    suspend fun subscribeToErrors(gameId: String, playerId: String): Flow<String> =
+        requireSession()
+            .subscribeText("/queue/game/$gameId/$playerId/errors")
+            .mapNotNull { payload ->
+                Log.d(tag, "WS error-event gameId=$gameId playerId=$playerId payload=$payload")
+                parseErrorMessageOrNull(payload)
+            }
+
+    /** Parses a game-state payload, logging and dropping it (returns null) when malformed. */
+    internal fun parseGameStateOrNull(payload: String): GameState? =
+        runCatching { GameState.fromJson(JSONObject(payload)) }
+            .onFailure { Log.w(tag, "Dropping malformed game-state payload", it) }
+            .getOrNull()
+
+    /** Parses a private-event payload, logging and dropping it (returns null) when malformed. */
+    internal fun parsePrivateEventOrNull(payload: String): JSONObject? =
+        runCatching { JSONObject(payload) }
+            .onFailure { Log.w(tag, "Dropping malformed private-event payload", it) }
+            .getOrNull()
+
+    /** Extracts the error message, logging and dropping the payload (returns null) when malformed. */
+    internal fun parseErrorMessageOrNull(payload: String): String? =
+        runCatching { JSONObject(payload).optString("message", "An error occurred.") }
+            .onFailure { Log.w(tag, "Dropping malformed error payload", it) }
+            .getOrNull()
 
     /** Fetches the latest game state snapshot over REST. */
     suspend fun fetchGameState(gameId: String, playerId: String): GameState {
@@ -89,12 +116,17 @@ class GameRepository(
                 check(response.isSuccessful) { "Game state fetch failed: ${response.code}" }
                 val body = response.body!!.string()
                 Log.d(tag, "REST response gameId=$gameId code=${response.code} body=$body")
-                GameState.fromBackendJson(JSONObject(body)).also { state ->
-                    Log.d(
-                        tag,
-                        "REST parsed gameId=$gameId currentPlayerId=${state.currentTurnPlayerId} turnCount=${state.turnCount} status=${state.status}"
-                    )
-                }
+                runCatching { GameState.fromBackendJson(JSONObject(body)) }
+                    .getOrElse { error ->
+                        Log.w(tag, "Malformed REST game-state body gameId=$gameId", error)
+                        throw IllegalStateException("Malformed game-state response for game $gameId", error)
+                    }
+                    .also { state ->
+                        Log.d(
+                            tag,
+                            "REST parsed gameId=$gameId currentPlayerId=${state.currentTurnPlayerId} turnCount=${state.turnCount} status=${state.status}"
+                        )
+                    }
             }
         }
     }
@@ -114,7 +146,10 @@ class GameRepository(
             httpClient.newCall(request).execute().use { response ->
                 if (response.code == 404) return@withContext null
                 check(response.isSuccessful) { "Game state fetch failed: ${response.code}" }
-                GameState.fromBackendJson(JSONObject(response.body!!.string()))
+                val body = response.body!!.string()
+                runCatching { GameState.fromBackendJson(JSONObject(body)) }
+                    .onFailure { Log.w(tag, "Dropping malformed REST game-state body gameId=$gameId", it) }
+                    .getOrNull()
             }
         }
     }

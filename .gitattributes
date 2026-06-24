@@ -1,0 +1,4 @@
+# animation assets: keep raw bytes intact, never text-normalize or merge.
+*.gif binary
+*.png binary
+*.webp binary

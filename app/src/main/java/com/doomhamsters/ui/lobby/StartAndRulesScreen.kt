@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
@@ -17,20 +19,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.fromHtml
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.doomhamsters.LobbyViewModel
 import com.doomhamsters.R
-import com.doomhamsters.ui.theme.DarkBrown
+import com.doomhamsters.ui.theme.AccentOrange
+import com.doomhamsters.ui.theme.BackgroundCream
+import com.doomhamsters.ui.theme.CardDarkMaroon
 import com.doomhamsters.ui.theme.DoomHamstersTheme
-import com.doomhamsters.ui.theme.Orange
 import com.doomhamsters.ui.theme.SoftWhite
-import com.doomhamsters.ui.theme.WarmAlmond
 
 /** Displays the app welcome screen and entry actions. */
 @Composable
@@ -41,7 +44,7 @@ fun StartScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(WarmAlmond)
+            .background(CardDarkMaroon)
             .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -54,7 +57,7 @@ fun StartScreen(
             lineHeight = 20.sp,
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = Orange
+            color = AccentOrange
         )
 
         Spacer(modifier = Modifier.weight(1f))
@@ -66,7 +69,7 @@ fun StartScreen(
                 .height(56.dp),
             shape = RoundedCornerShape(50),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Orange,
+                containerColor = AccentOrange,
                 contentColor = SoftWhite
             ),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
@@ -88,7 +91,7 @@ fun StartScreen(
                 .height(56.dp),
             shape = RoundedCornerShape(50),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Orange,
+                containerColor = AccentOrange,
                 contentColor = SoftWhite
             ),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
@@ -109,7 +112,7 @@ fun RulesScreen(modifier: Modifier = Modifier, onBackClick: () -> Unit) {
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(WarmAlmond)
+            .background(CardDarkMaroon)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -117,30 +120,34 @@ fun RulesScreen(modifier: Modifier = Modifier, onBackClick: () -> Unit) {
             text = stringResource(R.string.rules_title),
             fontSize = 32.sp,
             fontWeight = FontWeight.Bold,
-            color = Orange
+            color = AccentOrange
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
         Surface(
             shape = RoundedCornerShape(16.dp),
-            color = Color.White.copy(alpha = 0.5f),
+            color = BackgroundCream,
             modifier = Modifier
                 .fillMaxWidth()
+                .weight(1f)
                 .shadow(elevation = 1.dp, shape = RoundedCornerShape(16.dp))
         ) {
             Column(
-                modifier = Modifier.padding(16.dp)
+                modifier = Modifier
+                    .padding(16.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = stringResource(R.string.rules_content),
+                    text = AnnotatedString.fromHtml(stringResource(R.string.rules_content)),
                     fontSize = 18.sp,
-                    color = DarkBrown
+                    lineHeight = 24.sp,
+                    color = CardDarkMaroon
                 )
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
 
         Button(
             onClick = onBackClick,
@@ -149,8 +156,8 @@ fun RulesScreen(modifier: Modifier = Modifier, onBackClick: () -> Unit) {
                 .height(56.dp),
             shape = RoundedCornerShape(50),
             colors = ButtonDefaults.buttonColors(
-                containerColor = Orange,
-                contentColor = Color.White
+                containerColor = AccentOrange,
+                contentColor = SoftWhite
             ),
             elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp)
         ) {

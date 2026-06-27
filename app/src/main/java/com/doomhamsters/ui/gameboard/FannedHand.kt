@@ -9,6 +9,7 @@ import com.doomhamsters.cards.cardDescription
 import com.doomhamsters.cards.displayName
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.DraggableState
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
@@ -120,7 +121,7 @@ fun FannedHand(
         label = "smoothCenter"
     )
 
-    val containerModifier = rememberContainerModifier(
+    val containerModifier = Modifier.containerModifier(
         uiConfig = uiConfig,
         draggableState = draggableState,
         dragAccumulatorState = dragAccumulatorState
@@ -202,24 +203,20 @@ private fun updateTargetCenterFromDrag(
     }
 }
 
-private fun rememberContainerModifier(
+private fun Modifier.containerModifier(
     uiConfig: FannedHandUiConfig,
-    draggableState: androidx.compose.foundation.gestures.DraggableState,
+    draggableState: DraggableState,
     dragAccumulatorState: MutableFloatState
-): Modifier {
-    return Modifier
-        .fillMaxWidth()
-        .height(240.dp)
-        .then(uiConfig.modifier)
-        .then(centerMeasurementModifier(uiConfig.onCenterMeasured))
-        .then(interactionModifier(uiConfig, draggableState, dragAccumulatorState))
-}
+): Modifier = this
+    .fillMaxWidth()
+    .height(240.dp)
+    .then(uiConfig.modifier)
+    .centerMeasurement(uiConfig.onCenterMeasured)
+    .interaction(uiConfig, draggableState, dragAccumulatorState)
 
-private fun centerMeasurementModifier(
-    onCenterMeasured: ((Offset) -> Unit)?
-): Modifier {
-    return onCenterMeasured?.let { callback ->
-        Modifier.onGloballyPositioned { coordinates ->
+private fun Modifier.centerMeasurement(onCenterMeasured: ((Offset) -> Unit)?): Modifier =
+    onCenterMeasured?.let { callback ->
+        onGloballyPositioned { coordinates ->
             val position = coordinates.positionInRoot()
             val center = position + Offset(
                 x = coordinates.size.width / 2f,
@@ -227,17 +224,15 @@ private fun centerMeasurementModifier(
             )
             callback(center)
         }
-    } ?: Modifier
-}
+    } ?: this
 
-private fun interactionModifier(
+private fun Modifier.interaction(
     uiConfig: FannedHandUiConfig,
-    draggableState: androidx.compose.foundation.gestures.DraggableState,
+    draggableState: DraggableState,
     dragAccumulatorState: MutableFloatState
 ): Modifier {
-    if (uiConfig.isOpponent || !uiConfig.interactionEnabled) return Modifier
-
-    return Modifier.draggable(
+    if (uiConfig.isOpponent || !uiConfig.interactionEnabled) return this
+    return draggable(
         state = draggableState,
         orientation = Orientation.Horizontal,
         onDragStopped = { dragAccumulatorState.floatValue = 0f }

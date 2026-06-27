@@ -171,18 +171,23 @@ dependencies {
     implementation(libs.krossbow.stomp.core)
     implementation(libs.krossbow.websocket.okhttp)
     implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.ui)
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
     implementation(libs.zxing.android.embedded)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.robolectric)
     testImplementation(libs.org.json)
+    testImplementation(libs.mockk)
+    testImplementation(libs.mockk.agent)
+    testImplementation(libs.kotlinx.coroutines.test)
+
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.junit.jupiter.engine)
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
@@ -190,9 +195,7 @@ dependencies {
     androidTestImplementation(libs.mockk.android)
     androidTestImplementation(libs.mockk)
     androidTestImplementation(libs.mockk.agent)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    testImplementation(libs.mockk)
-    testImplementation(libs.mockk.agent)
-    testImplementation(libs.kotlinx.coroutines.test)
 }

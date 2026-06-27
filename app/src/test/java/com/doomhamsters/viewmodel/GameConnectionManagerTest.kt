@@ -75,14 +75,16 @@ class GameConnectionManagerTest {
                 manager.connectAndMaintain(
                     localPlayerId = "player-1",
                     localPlayerName = "Astrobot",
-                    onInitialConnect = {},
-                    onReconnect = {},
-                    onGameStateReceived = {},
-                    onPublicEventReceived = {},
-                    onPrivateEventReceived = {},
-                    onServerError = {},
-                    onFatalError = {},
-                    onLog = {}
+                    callbacks = GameConnectionCallbacks(
+                        onInitialConnect = {},
+                        onReconnect = {},
+                        onGameStateReceived = {},
+                        onPublicEventReceived = {},
+                        onPrivateEventReceived = {},
+                        onServerError = {},
+                        onFatalError = {},
+                        onLog = {}
+                    )
                 )
             }
 
@@ -156,14 +158,16 @@ class GameConnectionManagerTest {
             manager.connectAndMaintain(
                 localPlayerId = "player-1",
                 localPlayerName = "Astrobot",
-                onInitialConnect = {},
-                onReconnect = {},
-                onGameStateReceived = {},
-                onPublicEventReceived = {},
-                onPrivateEventReceived = {},
-                onServerError = {},
-                onFatalError = {},
-                onLog = {}
+                callbacks = GameConnectionCallbacks(
+                    onInitialConnect = {},
+                    onReconnect = {},
+                    onGameStateReceived = {},
+                    onPublicEventReceived = {},
+                    onPrivateEventReceived = {},
+                    onServerError = {},
+                    onFatalError = {},
+                    onLog = {}
+                )
             )
         }
 
@@ -255,14 +259,16 @@ class GameConnectionManagerTest {
             manager.connectAndMaintain(
                 localPlayerId = "player-1",
                 localPlayerName = "Alex",
-                onInitialConnect = {},
-                onReconnect = {},
-                onGameStateReceived = {},
-                onPublicEventReceived = {},
-                onPrivateEventReceived = {},
-                onServerError = {},
-                onFatalError = {},
-                onLog = {}
+                callbacks = GameConnectionCallbacks(
+                    onInitialConnect = {},
+                    onReconnect = {},
+                    onGameStateReceived = {},
+                    onPublicEventReceived = {},
+                    onPrivateEventReceived = {},
+                    onServerError = {},
+                    onFatalError = {},
+                    onLog = {}
+                )
             )
         }
 

@@ -206,6 +206,37 @@ class LobbyRepositoryTest {
         }
     }
 
+    @Test
+    fun `leaveLobby sends post request to correct url`() = runTest {
+        stubHttpResponse(200, "")
+
+        repository.leaveLobby("TEST_LOBBY", "u1")
+
+        coVerify {
+            mockHttpClient.newCall(match { request ->
+                request.url.toString().contains("/api/lobby/TEST_LOBBY/leave") &&
+                    request.method == "POST"
+            })
+        }
+    }
+
+    @Test
+    fun `leaveLobby handles server error gracefully without throwing`() = runTest {
+        stubHttpResponse(500, "")
+
+        repository.leaveLobby("TEST_LOBBY", "u1")
+        // Should complete without throwing
+    }
+
+    @Test
+    fun `getLobby returns null for non-200 response`() = runTest {
+        stubHttpResponse(404, "")
+
+        val result = repository.getLobby("MISSING")
+
+        assertNull(result)
+    }
+
     private fun stubHttpResponse(code: Int, body: String) {
         val responseBody = body.toResponseBody("application/json".toMediaType())
         val dummyRequest = Request.Builder().url("http://localhost:8080/test").build()

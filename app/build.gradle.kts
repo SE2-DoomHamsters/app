@@ -3,8 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("jacoco")
-    id("org.sonarqube") version "5.1.0.4882"
-    id("org.jetbrains.dokka")
+    alias(libs.plugins.sonarqube)
+    alias(libs.plugins.dokka)
 }
 
 val signingStoreFile   = System.getenv("SIGNING_STORE_FILE")
@@ -41,7 +41,7 @@ android {
     buildTypes {
         release {
             if (canSign) signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -149,6 +149,10 @@ sonar {
     }
 }
 
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -171,13 +175,12 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
-    implementation(libs.androidx.compose.foundation)
+    implementation(libs.zxing.android.embedded)
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
-    testImplementation("org.robolectric:robolectric:4.11.1")
-    testImplementation("org.json:json:20231013")
+    testImplementation(libs.robolectric)
+    testImplementation(libs.org.json)
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.junit.jupiter.engine)
     androidTestImplementation(libs.androidx.junit)

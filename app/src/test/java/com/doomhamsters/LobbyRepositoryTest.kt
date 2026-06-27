@@ -8,6 +8,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.test.runTest
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
@@ -202,7 +203,7 @@ class LobbyRepositoryTest {
     @Test
     fun `subscribeLobbyUpdates throws when not connected`() = runTest {
         assertThrows<IllegalStateException> {
-            repository.subscribeLobbyUpdates("TEST")
+            repository.subscribeLobbyUpdates("TEST").collect()
         }
     }
 

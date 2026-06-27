@@ -18,6 +18,7 @@ import okhttp3.ResponseBody.Companion.toResponseBody
 import org.hildan.krossbow.stomp.StompClient
 import org.hildan.krossbow.stomp.StompSession
 import org.json.JSONObject
+import kotlinx.coroutines.flow.collect
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -90,14 +91,14 @@ class GameRepositoryTest {
     @Test
     fun `subscribeToGame throws when not connected`() = runTest {
         assertThrows<IllegalStateException> {
-            repository.subscribeToGame("GAME-1")
+            repository.subscribeToGame("GAME-1").collect()
         }
     }
 
     @Test
     fun `subscribeToPrivateEvents throws when not connected`() = runTest {
         assertThrows<IllegalStateException> {
-            repository.subscribeToPrivateEvents("GAME-1", "PLAYER-1")
+            repository.subscribeToPrivateEvents("GAME-1", "PLAYER-1").collect()
         }
     }
 

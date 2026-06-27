@@ -36,6 +36,9 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "BASE_URL", "\"143.205.174.196:53217\"")
+        buildConfigField("String", "LOCAL_URL", "\"10.0.2.2:8080\"")
     }
 
     buildTypes {
@@ -61,6 +64,7 @@ android {
     buildFeatures {
         compose = true
         viewBinding = true
+        buildConfig = true
     }
     packaging {
 

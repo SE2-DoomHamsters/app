@@ -38,6 +38,7 @@ class LobbyRepository(
 ) {
     private companion object {
         const val TAG = "LobbyDebug"
+        const val MEDIA_TYPE_JSON = "application/json"
     }
 
     internal var session: StompSession? = null
@@ -65,7 +66,7 @@ class LobbyRepository(
             .put("groupName", groupName)
             .put("user", user.toJson())
             .toString()
-            .toRequestBody("application/json".toMediaType())
+            .toRequestBody(MEDIA_TYPE_JSON.toMediaType())
 
         val request = Request.Builder()
             .url("http://$baseUrl/api/lobby/create")
@@ -87,7 +88,7 @@ class LobbyRepository(
 
     /** Attempts to join an existing lobby and returns its snapshot on success. */
     suspend fun joinLobby(lobbyId: String, user: User): Lobby? {
-        val body = user.toJson().toString().toRequestBody("application/json".toMediaType())
+        val body = user.toJson().toString().toRequestBody(MEDIA_TYPE_JSON.toMediaType())
 
         val request = Request.Builder()
             .url("http://$baseUrl/api/lobby/$lobbyId/join")
@@ -153,7 +154,7 @@ class LobbyRepository(
 
     /** Requests that the backend start a game for the lobby. */
     suspend fun triggerGameStart(lobbyId: String, userId: String) {
-        val body = ByteArray(0).toRequestBody("application/json".toMediaType())
+        val body = ByteArray(0).toRequestBody(MEDIA_TYPE_JSON.toMediaType())
 
         val request = Request.Builder()
             .url("http://$baseUrl/api/game/start?lobbyId=$lobbyId&userId=$userId")
@@ -189,7 +190,7 @@ class LobbyRepository(
      */
     suspend fun leaveLobby(lobbyId: String, userId: String) {
         val body = JSONObject().put("userId", userId).toString()
-            .toRequestBody("application/json".toMediaType())
+            .toRequestBody(MEDIA_TYPE_JSON.toMediaType())
 
         val request = Request.Builder()
             .url("http://$baseUrl/api/lobby/$lobbyId/leave")

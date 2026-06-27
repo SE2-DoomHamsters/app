@@ -34,7 +34,7 @@ class ModelTests {
         }
         val deck = Deck.fromJson(arr)
         assertEquals(2, deck.size())
-        assertEquals(CardType.Normal, deck.draw()?.type ?: deck.draw()?.type)
+        assertEquals(CardType.Doom, deck.draw()?.type)
     }
 
     @Test
@@ -286,7 +286,7 @@ class ModelTests {
             put("lives", 2)
         }
         val player = Player.fromJson(json)
-        assertEquals("Player eid", player.name)
+        assertEquals("Player erid", player.name)
     }
 
     @Test

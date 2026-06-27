@@ -1,10 +1,30 @@
 <resources>
     <string name="app_name">DoomHamsters</string>
-    <string name="rules_title">Spielregeln</string>
-    <string name="rules_content">Hier werden die Spielregeln stehen:\n\n 1. &#8230; \n\n 2. &#8230; \n\n 3. &#8230;</string>
-    <string name="rules_back">Zurück zur Lobby</string>
-    <string name="welcome_message">Willkommen bei\n\nDoom Hamsters!</string>
-    <string name="rules_button_text">Spielregeln ansehen</string>
-    <string name="start_button_text">Spiel starten</string>
-    <string name="leave_lobby_text">LOBBY VERLASSEN</string>
+    <string name="title_activity_rules">RulesActivity</string>
+    <string name="rules_title">Rules</string>
+    <string name="rules_content">&lt;b&gt;Goal&lt;/b&gt;&lt;br&gt;Be the last hamster standing.&lt;br&gt;&lt;br&gt;
+&lt;b&gt;Your turn&lt;/b&gt;&lt;br&gt;Play any action cards you like, then end your turn by drawing one card from the deck.&lt;br&gt;&lt;br&gt;
+&lt;b&gt;Doom&lt;/b&gt;&lt;br&gt;Draw a Doom card and you lose a life. A Snack Stash saves you. Lose all your lives and you\'re out.&lt;br&gt;&lt;br&gt;
+&lt;b&gt;Cheating &#8211; the Snack Stash bluff&lt;/b&gt;&lt;br&gt;When you face a Doom you can play a real Snack Stash, or bluff by claiming one you don\'t have. The other players then vote Accept or Challenge:&lt;br&gt;
+&#8226; Nobody challenges &#8211; your claim stands and you survive.&lt;br&gt;
+&#8226; Challenged while bluffing &#8211; you\'re caught and take the Doom.&lt;br&gt;
+&#8226; Challenged but you really had it &#8211; the challenger was wrong and pays for it.&lt;br&gt;&lt;br&gt;
+&lt;b&gt;Cards&lt;/b&gt;&lt;br&gt;
+&#8226; &lt;i&gt;Snack Stash&lt;/i&gt; &#8211; Saves you from one Doom.&lt;br&gt;
+&#8226; &lt;i&gt;Sign of Fate&lt;/i&gt; &#8211; Gain 1 life.&lt;br&gt;
+&#8226; &lt;i&gt;Power Nap&lt;/i&gt; &#8211; Skip drawing and end your turn.&lt;br&gt;
+&#8226; &lt;i&gt;Quick Peek&lt;/i&gt; &#8211; Privately see the top card.&lt;br&gt;
+&#8226; &lt;i&gt;Sniff Ahead&lt;/i&gt; &#8211; Secretly see the top 3 cards.&lt;br&gt;
+&#8226; &lt;i&gt;Tunnel Chaos&lt;/i&gt; &#8211; Shuffle the deck.&lt;br&gt;
+&#8226; &lt;i&gt;Tiny Thief&lt;/i&gt; &#8211; Steal a random card from a player.&lt;br&gt;
+&#8226; &lt;i&gt;Beg for Snacks&lt;/i&gt; &#8211; Name a card and a player; if they have it, they hand it over.&lt;br&gt;
+&#8226; &lt;i&gt;Cage Swap&lt;/i&gt; &#8211; Swap hands with the next player.&lt;br&gt;
+&#8226; &lt;i&gt;Hyper Mode&lt;/i&gt; &#8211; The next player takes an extra turn.&lt;br&gt;
+&#8226; &lt;i&gt;Squick&lt;/i&gt; &#8211; Cancel the last played card.&lt;br&gt;
+&#8226; &lt;i&gt;Hamster Combos&lt;/i&gt; &#8211; Play 2 to steal a random card, 3 to take a named card, 4 to steal a life.</string>
+    <string name="rules_back">Back to Lobby</string>
+    <string name="welcome_message">Welcome to\n\nDoom Hamsters!</string>
+    <string name="rules_button_text">View Rules</string>
+    <string name="start_button_text">Start Game</string>
+    <string name="leave_lobby_text">LEAVE LOBBY</string>
 </resources>

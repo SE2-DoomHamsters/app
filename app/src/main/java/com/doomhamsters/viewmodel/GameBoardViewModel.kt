@@ -680,9 +680,6 @@ open class GameBoardViewModel(
     /** Returns whether the local player can activate the supplied card right now. */
     fun canActivateCard(card: Card): Boolean = cardActivation.canActivate(card)
 
-    /** Sends the activation request for a playable card. */
-    //fun activateCard(card: Card) = cardActivation.activate(card)
-
     /** Called by the UI once the player has chosen a target and card type. */
     fun activateCardWithTargets(
         card: Card,
@@ -706,10 +703,6 @@ open class GameBoardViewModel(
             return
         }
 
-        /** Cancels a pending targeted-card selection. */
-        fun cancelTargetedCardSelection() = cardActivation.cancelSelection()
-
-
         viewModelScope.launch {
             try {
                 _isActivatingCard.value = true
@@ -729,10 +722,7 @@ open class GameBoardViewModel(
                         if (parameters.isNotEmpty()) {
                             val paramsJson = JSONObject()
                             parameters.forEach { (key, value) -> paramsJson.put(key, value) }
-                            put(
-                                "parameters",
-                                paramsJson
-                            ) // 'put' packt es direkt in das fertige toJson()
+                            put("parameters", paramsJson)
                         }
                     })
                 broadcastLatestState()
@@ -751,14 +741,11 @@ open class GameBoardViewModel(
 
     fun selectStealTarget(targetPlayerId: String) {
         val card = _selectedCardForActivation.value ?: return
-        _showTargetSelectionDialog.value = false // Dialog schließen
-
-        // Jetzt feuern wir die Karte ab – diesmal MIT dem Parameter!
+        _showTargetSelectionDialog.value = false
         activateCard(card, mapOf("targetPlayerId" to targetPlayerId))
         _selectedCardForActivation.value = null
     }
 
-    /** Wird aufgerufen, wenn der Spieler den Auswahldialog abbricht */
     fun dismissTargetSelection() {
         _showTargetSelectionDialog.value = false
         _selectedCardForActivation.value = null

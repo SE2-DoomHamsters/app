@@ -1,6 +1,7 @@
 package com.doomhamsters
 
 import android.content.Context
+import androidx.core.content.edit
 import java.util.UUID
 
 /** Persists the local player identity, profile details, and active game session. */
@@ -29,7 +30,7 @@ class SharedPrefsSessionStore(context: Context) : SessionStore {
         }
 
         val newUserId = UUID.randomUUID().toString()
-        prefs.edit().putString(KEY_USER_ID, newUserId).apply()
+        prefs.edit { putString(KEY_USER_ID, newUserId) }
         return newUserId
     }
 
@@ -38,17 +39,17 @@ class SharedPrefsSessionStore(context: Context) : SessionStore {
     override fun loadAvatar(): String? = prefs.getString(KEY_AVATAR, null)
 
     override fun saveProfile(username: String, avatar: String) {
-        prefs.edit()
-            .putString(KEY_USERNAME, username)
-            .putString(KEY_AVATAR, avatar)
-            .apply()
+        prefs.edit {
+            putString(KEY_USERNAME, username)
+            putString(KEY_AVATAR, avatar)
+        }
     }
 
     override fun saveActiveGameId(gameId: String, lobbyId: String?) {
-        prefs.edit()
-            .putString(KEY_ACTIVE_GAME_ID, gameId)
-            .putString(KEY_ACTIVE_LOBBY_ID, lobbyId)
-            .apply()
+        prefs.edit {
+            putString(KEY_ACTIVE_GAME_ID, gameId)
+            putString(KEY_ACTIVE_LOBBY_ID, lobbyId)
+        }
     }
 
     override fun loadActiveGameId(): String? = prefs.getString(KEY_ACTIVE_GAME_ID, null)
@@ -56,10 +57,10 @@ class SharedPrefsSessionStore(context: Context) : SessionStore {
     override fun loadActiveLobbyId(): String? = prefs.getString(KEY_ACTIVE_LOBBY_ID, null)
 
     override fun clearActiveGame() {
-        prefs.edit()
-            .remove(KEY_ACTIVE_GAME_ID)
-            .remove(KEY_ACTIVE_LOBBY_ID)
-            .apply()
+        prefs.edit {
+            remove(KEY_ACTIVE_GAME_ID)
+            remove(KEY_ACTIVE_LOBBY_ID)
+        }
     }
 
     private companion object {

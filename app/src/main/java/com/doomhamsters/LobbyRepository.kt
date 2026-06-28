@@ -3,8 +3,11 @@ package com.doomhamsters
 import android.util.Log
 import com.doomhamsters.data.Lobby
 import com.doomhamsters.data.User
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -34,10 +37,12 @@ class LobbyRepository(
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .build()
         )
-    )
+    ),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     private companion object {
         const val TAG = "LobbyDebug"
+        const val MEDIA_TYPE_JSON = "application/json"
     }
 
     internal var session: StompSession? = null
@@ -65,14 +70,14 @@ class LobbyRepository(
             .put("groupName", groupName)
             .put("user", user.toJson())
             .toString()
-            .toRequestBody("application/json".toMediaType())
+            .toRequestBody(MEDIA_TYPE_JSON.toMediaType())
 
         val request = Request.Builder()
             .url("http://$baseUrl/api/lobby/create")
             .post(body)
             .build()
 
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             httpClient.newCall(request).execute().use { response ->
                 val payload = response.body?.string().orEmpty()
                 check(response.isSuccessful) {
@@ -87,14 +92,14 @@ class LobbyRepository(
 
     /** Attempts to join an existing lobby and returns its snapshot on success. */
     suspend fun joinLobby(lobbyId: String, user: User): Lobby? {
-        val body = user.toJson().toString().toRequestBody("application/json".toMediaType())
+        val body = user.toJson().toString().toRequestBody(MEDIA_TYPE_JSON.toMediaType())
 
         val request = Request.Builder()
             .url("http://$baseUrl/api/lobby/$lobbyId/join")
             .post(body)
             .build()
 
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             httpClient.newCall(request).execute().use { response ->
                 val payload = response.body?.string().orEmpty()
                 when {
@@ -128,7 +133,7 @@ class LobbyRepository(
             .get()
             .build()
 
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             httpClient.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     response.body?.string().orEmpty().also { payload ->
@@ -143,24 +148,27 @@ class LobbyRepository(
     }
 
     /** Subscribes to realtime lobby updates. */
-    suspend fun subscribeLobbyUpdates(lobbyId: String): Flow<Lobby> =
-        checkNotNull(session) { "Call connect() before subscribing" }
-            .subscribeText("/topic/lobby/$lobbyId")
-            .map { payload ->
-                Log.d(TAG, "STOMP /topic/lobby/$lobbyId update: ${payload.toLobbySummary()}")
-                payload.toLobby()
-            }
+    fun subscribeLobbyUpdates(lobbyId: String): Flow<Lobby> = flow {
+        emitAll(
+            checkNotNull(session) { "Call connect() before subscribing" }
+                .subscribeText("/topic/lobby/$lobbyId")
+                .map { payload ->
+                    Log.d(TAG, "STOMP /topic/lobby/$lobbyId update: ${payload.toLobbySummary()}")
+                    payload.toLobby()
+                }
+        )
+    }
 
     /** Requests that the backend start a game for the lobby. */
     suspend fun triggerGameStart(lobbyId: String, userId: String) {
-        val body = ByteArray(0).toRequestBody("application/json".toMediaType())
+        val body = ByteArray(0).toRequestBody(MEDIA_TYPE_JSON.toMediaType())
 
         val request = Request.Builder()
             .url("http://$baseUrl/api/game/start?lobbyId=$lobbyId&userId=$userId")
             .post(body)
             .build()
 
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             httpClient.newCall(request).execute().use { response ->
                 val payload = response.body?.string().orEmpty()
                 check(response.isSuccessful) {
@@ -171,13 +179,16 @@ class LobbyRepository(
     }
 
     /** Subscribes to realtime game start notifications for a lobby. */
-    suspend fun subscribeGameStart(lobbyId: String): Flow<String> =
-        checkNotNull(session) { "Call connect() before subscribing" }
-            .subscribeText("/topic/game/$lobbyId")
-            .map { jsonString ->
-                Log.d(TAG, "STOMP /topic/game/$lobbyId start payload: $jsonString")
-                JSONObject(jsonString).getString("gameId")
-            }
+    fun subscribeGameStart(lobbyId: String): Flow<String> = flow {
+        emitAll(
+            checkNotNull(session) { "Call connect() before subscribing" }
+                .subscribeText("/topic/game/$lobbyId")
+                .map { jsonString ->
+                    Log.d(TAG, "STOMP /topic/game/$lobbyId start payload: $jsonString")
+                    JSONObject(jsonString).getString("gameId")
+                }
+        )
+    }
 
     /**
      * Meldet einen Spieler von einer Lobby ab
@@ -189,14 +200,14 @@ class LobbyRepository(
      */
     suspend fun leaveLobby(lobbyId: String, userId: String) {
         val body = JSONObject().put("userId", userId).toString()
-            .toRequestBody("application/json".toMediaType())
+            .toRequestBody(MEDIA_TYPE_JSON.toMediaType())
 
         val request = Request.Builder()
             .url("http://$baseUrl/api/lobby/$lobbyId/leave")
             .post(body)
             .build()
 
-        withContext(Dispatchers.IO) {
+        withContext(ioDispatcher) {
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
                     println("Leave lobby failed: ${response.code}")

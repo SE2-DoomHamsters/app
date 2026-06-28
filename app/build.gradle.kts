@@ -3,8 +3,8 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("jacoco")
-    id("org.sonarqube") version "5.1.0.4882"
-    id("org.jetbrains.dokka")
+    alias(libs.plugins.sonarqube)
+    alias(libs.plugins.dokka)
 }
 
 val signingStoreFile   = System.getenv("SIGNING_STORE_FILE")
@@ -36,12 +36,15 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "BASE_URL", "\"143.205.174.196:53217\"")
+        buildConfigField("String", "LOCAL_URL", "\"10.0.2.2:8080\"")
     }
 
     buildTypes {
         release {
             if (canSign) signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -61,6 +64,7 @@ android {
     buildFeatures {
         compose = true
         viewBinding = true
+        buildConfig = true
     }
     packaging {
 
@@ -149,6 +153,10 @@ sonar {
     }
 }
 
+dependencyLocking {
+    lockAllConfigurations()
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -167,19 +175,23 @@ dependencies {
     implementation(libs.krossbow.stomp.core)
     implementation(libs.krossbow.websocket.okhttp)
     implementation(libs.androidx.compose.foundation)
-    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.ui)
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
-    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
-    implementation(libs.androidx.compose.foundation)
+    implementation(libs.zxing.android.embedded)
+
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit)
     testImplementation(libs.junit.jupiter.api)
-    testImplementation("org.robolectric:robolectric:4.11.1")
-    testImplementation("org.json:json:20231013")
+    testImplementation(libs.robolectric)
+    testImplementation(libs.org.json)
+    testImplementation(libs.mockk)
+    testImplementation(libs.mockk.agent)
+    testImplementation(libs.kotlinx.coroutines.test)
+
     testRuntimeOnly(libs.junit.platform.launcher)
     testRuntimeOnly(libs.junit.jupiter.engine)
+
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
@@ -187,9 +199,7 @@ dependencies {
     androidTestImplementation(libs.mockk.android)
     androidTestImplementation(libs.mockk)
     androidTestImplementation(libs.mockk.agent)
+
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    testImplementation(libs.mockk)
-    testImplementation(libs.mockk.agent)
-    testImplementation(libs.kotlinx.coroutines.test)
 }

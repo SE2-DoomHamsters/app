@@ -42,7 +42,6 @@ import kotlin.collections.orEmpty
     @Composable
     fun ActiveLobbyScreen(viewModel: LobbyViewModel) {
         val lobbyState by viewModel.lobby.collectAsState()
-        val isConnected by viewModel.isConnected.collectAsState()
         val startAvailabilityMessage = viewModel.startAvailabilityMessage()
         val canStartGame = viewModel.canCurrentUserStartGame()
 

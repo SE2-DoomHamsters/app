@@ -30,7 +30,6 @@ import kotlin.collections.orEmpty
         val activeGameSession by viewModel.activeGameSession.collectAsState()
         val lobbyState by viewModel.lobby.collectAsState()
         val errorState by viewModel.error.collectAsState()
-        val isLoadingState by viewModel.isLoading.collectAsState()
         val infoMessage by viewModel.infoMessage.collectAsState()
         val snackbarHostState = remember { SnackbarHostState() }
 

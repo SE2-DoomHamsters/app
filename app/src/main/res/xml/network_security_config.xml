@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Cleartext (HTTP/WS) is restricted to the two known backend hosts only.
+    All other connections are required to use TLS.
+
+    143.205.174.196 - production game server (BackendConfig.BASE_URL)
+    10.0.2.2        - Android emulator loopback to host machine (BackendConfig.LOCAL_URL)
+
+    TODO: Remove both <domain> entries and this file once the backend serves HTTPS/WSS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">143.205.174.196</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

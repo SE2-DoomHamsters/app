@@ -10,6 +10,7 @@ import io.mockk.just
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -23,7 +24,9 @@ import kotlinx.coroutines.test.setMain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -563,6 +566,112 @@ class LobbyViewModelTest {
 
         viewModel.clearInfoMessage()
         assertNull(viewModel.infoMessage.value)
+    }
+
+    @Test
+    fun `startGame does nothing when no lobby is loaded`() = runTest {
+        viewModel.startGame()
+        advanceUntilIdle()
+        coVerify(exactly = 0) { mockRepo.triggerGameStart(any(), any()) }
+    }
+
+    @Test
+    fun `startGame is ignored when it is already in progress`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns startableLobby
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+        coEvery { mockRepo.subscribeGameStart(any()) } returns emptyFlow()
+        coEvery { mockRepo.triggerGameStart(any(), any()) } coAnswers { awaitCancellation() }
+
+        viewModel.username = "Christian"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+
+        viewModel.startGame()
+        assertTrue(viewModel.isStartingGame)
+
+        viewModel.startGame()
+
+        coVerify(exactly = 1) { mockRepo.triggerGameStart(any(), any()) }
+    }
+
+    @Test
+    fun `startAvailabilityMessage returns null when no lobby is loaded`() {
+        assertNull(viewModel.startAvailabilityMessage())
+    }
+
+    @Test
+    fun `startAvailabilityMessage returns processing message when game is already started`() = runTest {
+        coEvery { mockRepo.connect() } just Runs
+        coEvery { mockRepo.createLobby(any(), any()) } returns startableLobby.copy(gameStarted = true)
+        coEvery { mockRepo.subscribeLobbyUpdates(any()) } returns emptyFlow()
+
+        viewModel.username = "Christian"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+
+        assertEquals("Spielstart wird verarbeitet...", viewModel.startAvailabilityMessage())
+    }
+
+    @Test
+    fun `leaveLobby resets state even when no lobby was loaded`() = runTest {
+        viewModel.leaveLobby()
+        advanceUntilIdle()
+
+        assertEquals(1, viewModel.currentStep)
+        assertNull(viewModel.lobby.value)
+        coVerify(exactly = 0) { mockRepo.leaveLobby(any(), any()) }
+    }
+
+    @Test
+    fun `error message maps timeout to user-friendly text`() = runTest {
+        coEvery { mockRepo.createLobby(any(), any()) } throws RuntimeException("Connection timeout exceeded")
+        viewModel.username = "Anna"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+        assertEquals(
+            "Die Verbindung zum Server hat zu lange gedauert. Bitte versuche es erneut.",
+            viewModel.error.value
+        )
+    }
+
+    @Test
+    fun `error message maps failed to connect to user-friendly text`() = runTest {
+        coEvery { mockRepo.createLobby(any(), any()) } throws RuntimeException("Failed to connect to host")
+        viewModel.username = "Anna"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+        assertEquals(
+            "Der Server ist aktuell nicht erreichbar. Prüfe deine Internetverbindung oder die Server-Adresse.",
+            viewModel.error.value
+        )
+    }
+
+    @Test
+    fun `error message maps full lobby to user-friendly text`() = runTest {
+        coEvery { mockRepo.createLobby(any(), any()) } throws RuntimeException("Lobby is full")
+        viewModel.username = "Anna"
+        viewModel.groupName = "DoomUnit"
+        viewModel.createGroup()
+        advanceUntilIdle()
+        assertEquals("Diese Lobby ist leider schon voll.", viewModel.error.value)
+    }
+
+    @Test
+    fun `username setter persists profile to session store`() {
+        viewModel.username = "NewName"
+        assertEquals("NewName", sessionStore.loadUsername())
+    }
+
+    @Test
+    fun `selectedAvatar setter persists profile to session store`() {
+        viewModel.username = "Player"
+        viewModel.selectedAvatar = "cat"
+        assertEquals("cat", sessionStore.loadAvatar())
     }
 
     @Test

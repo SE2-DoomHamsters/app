@@ -1,5 +1,10 @@
 package com.doomhamsters.logic
 
+import com.doomhamsters.cards.CardCommandId
+import com.doomhamsters.cards.CardRegistry
+import com.doomhamsters.cards.definitions.CardCommandDefinition
+import com.doomhamsters.logic.cardcommands.CardCommand
+import com.doomhamsters.logic.cardcommands.CardCommandOutcome
 import com.doomhamsters.model.*
 import io.mockk.*
 import org.junit.jupiter.api.AfterEach
@@ -233,6 +238,179 @@ class GameEngineTests {
 
         assertEquals(1, gameState.currentPlayerIndex)
     }
+
+    // region activateCard
+
+    @Test
+    fun test_activateCard_unknownPlayer_throwsInvalidActionException() {
+        assertThrows<InvalidActionException> {
+            engine.activateCard("ghost", "c1")
+        }
+    }
+
+    @Test
+    fun test_activateCard_deadPlayer_throwsInvalidActionException() {
+        gameState.players.first().lives = 0
+        assertThrows<InvalidActionException> {
+            engine.activateCard("fat", "c1")
+        }
+    }
+
+    @Test
+    fun test_activateCard_notPlayersTurn_throwsInvalidActionException() {
+        // currentTurnPlayerId resolves to players[0].id = "fat"
+        assertThrows<InvalidActionException> {
+            engine.activateCard("zombie", "c1")
+        }
+    }
+
+    @Test
+    fun test_activateCard_cardNotInHand_throwsInvalidActionException() {
+        assertThrows<InvalidActionException> {
+            engine.activateCard("fat", "missing-id")
+        }
+    }
+
+    @Test
+    fun test_activateCard_cardHasNoCommand_throwsInvalidActionException() {
+        val card = Card(CardType.Normal, id = "n1")
+        gameState.players.first { it.id == "fat" }.hand.add(card)
+        assertThrows<InvalidActionException> {
+            engine.activateCard("fat", "n1")
+        }
+    }
+
+    @Test
+    fun test_activateCard_commandHasNoExecutor_throwsInvalidActionException() {
+        mockkObject(CardRegistry)
+        val card = Card(CardType.PowerNap, id = "pn1")
+        gameState.players.first { it.id == "fat" }.hand.add(card)
+        every { CardRegistry.commandFor(any()) } returns CardCommandDefinition(
+            id = CardCommandId.POWER_NAP,
+            executor = null
+        )
+        assertThrows<InvalidActionException> {
+            engine.activateCard("fat", "pn1")
+        }
+    }
+
+    @Test
+    fun test_activateCard_returnsOutcomeFromExecutor() {
+        mockkObject(CardRegistry)
+        val card = Card(CardType.PowerNap, id = "pn1")
+        val mockCommand = mockk<CardCommand>()
+        val expectedOutcome = CardCommandOutcome(publicMessage = "test outcome")
+        gameState.players.first { it.id == "fat" }.hand.add(card)
+        every { CardRegistry.commandFor(any()) } returns CardCommandDefinition(
+            id = CardCommandId.POWER_NAP,
+            executor = mockCommand
+        )
+        every { mockCommand.execute(any()) } returns expectedOutcome
+
+        val result = engine.activateCard("fat", "pn1")
+
+        assertEquals(expectedOutcome, result)
+    }
+
+    @Test
+    fun test_activateCard_endsTurnTrue_advancesTurn() {
+        val card = Card(CardType.PowerNap, id = "pn1")
+        gameState.players.first { it.id == "fat" }.hand.add(card)
+        gameState.currentPlayerIndex = 0
+
+        engine.activateCard("fat", "pn1")
+
+        assertNotEquals(0, gameState.currentPlayerIndex)
+    }
+
+    @Test
+    fun test_activateCard_endsTurnFalse_doesNotAdvanceTurn() {
+        mockkObject(CardRegistry)
+        val card = Card(CardType.PowerNap, id = "pn1")
+        val mockCommand = mockk<CardCommand>()
+        gameState.players.first { it.id == "fat" }.hand.add(card)
+        every { CardRegistry.commandFor(any()) } returns CardCommandDefinition(
+            id = CardCommandId.POWER_NAP,
+            executor = mockCommand
+        )
+        every { mockCommand.execute(any()) } returns CardCommandOutcome(
+            publicMessage = "done",
+            endsTurn = false
+        )
+        gameState.currentPlayerIndex = 0
+
+        engine.activateCard("fat", "pn1")
+
+        assertEquals(0, gameState.currentPlayerIndex)
+    }
+
+    // endregion
+
+    // region discardFromHand
+
+    @Test
+    fun test_discardFromHand_cardInHand_removesFromHandAndAddsToDiscard() {
+        val card = Card(CardType.Normal, id = "n1")
+        val player = gameState.players.first { it.id == "fat" }
+        player.hand.add(card)
+
+        engine.discardFromHand(player, card)
+
+        assertFalse(player.hand.contains(card))
+        assertEquals(card, gameState.discard.peekTop())
+    }
+
+    @Test
+    fun test_discardFromHand_cardNotInHand_throwsInvalidActionException() {
+        val card = Card(CardType.Normal, id = "notInHand")
+        val player = gameState.players.first { it.id == "fat" }
+
+        assertThrows<InvalidActionException> {
+            engine.discardFromHand(player, card)
+        }
+    }
+
+    // endregion
+
+    // region peekTopCard / peekTopCards
+
+    @Test
+    fun test_peekTopCard_returnsTopCardWithoutRemoving() {
+        val topCard = Card(CardType.PowerNap)
+        every { GameFactory.createGame(any()) } returns makeGameState(
+            deckCards = listOf(Card(CardType.Normal), topCard)
+        )
+        val engine = GameEngine(playerIds)
+        val deckSizeBefore = engine.getState().deck.size()
+
+        val peeked = engine.peekTopCard()
+
+        assertEquals(CardType.PowerNap, peeked?.type)
+        assertEquals(deckSizeBefore, engine.getState().deck.size())
+    }
+
+    @Test
+    fun test_peekTopCards_returnsRequestedCardsWithoutRemoving() {
+        val cards = listOf(Card(CardType.Normal), Card(CardType.PowerNap), Card(CardType.Doom))
+        every { GameFactory.createGame(any()) } returns makeGameState(deckCards = cards)
+        val engine = GameEngine(playerIds)
+        val deckSizeBefore = engine.getState().deck.size()
+
+        val peeked = engine.peekTopCards(2)
+
+        assertEquals(2, peeked.size)
+        assertEquals(deckSizeBefore, engine.getState().deck.size())
+    }
+
+    @Test
+    fun test_peekTopCard_emptyDeck_returnsNull() {
+        every { GameFactory.createGame(any()) } returns makeGameState(deckCards = emptyList())
+        val engine = GameEngine(playerIds)
+
+        assertNull(engine.peekTopCard())
+    }
+
+    // endregion
 
     private fun makeGameState(
         deckCards: List<Card> = listOf(

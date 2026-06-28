@@ -12,6 +12,7 @@ import com.doomhamsters.cheating.SnackStashClaimEvent
 import io.mockk.*
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flowOf
@@ -820,6 +821,130 @@ class GameBoardViewModelStateSyncTest {
                 }
             )
         }
+    }
+
+    @Test
+    fun `advanceTurn sends nextTurn when it is local player turn`() = runTest {
+        val localPlayerId = "player-1"
+        val state = gameState(currentPlayerId = localPlayerId, localHand = emptyList(), localHandSizeHint = 0)
+
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returns state
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+        coEvery { repository.sendAction(any(), any(), any()) } just Runs
+
+        val viewModel = createViewModel("game-1", localPlayerId, "Local", repository)
+        advanceUntilIdle()
+
+        viewModel.advanceTurn()
+        advanceUntilIdle()
+
+        coVerify { repository.sendAction("game-1", "nextTurn", any()) }
+    }
+
+    @Test
+    fun `advanceTurn is ignored when it is not local player turn`() = runTest {
+        val localPlayerId = "player-1"
+        val state = gameState(currentPlayerId = "player-2", localHand = emptyList(), localHandSizeHint = 0)
+
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returns state
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+
+        val viewModel = createViewModel("game-1", localPlayerId, "Local", repository)
+        advanceUntilIdle()
+
+        viewModel.advanceTurn()
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) { repository.sendAction(any(), "nextTurn", any()) }
+    }
+
+    @Test
+    fun `dismissDoomNotice sends doom ack and nextTurn when local player turn and no selection pending`() = runTest {
+        val localPlayerId = "player-1"
+        val state = gameState(currentPlayerId = localPlayerId, localHand = emptyList(), localHandSizeHint = 0)
+
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returns state
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+        coEvery { repository.sendAction(any(), any(), any()) } just Runs
+
+        val viewModel = createViewModel("game-1", localPlayerId, "Local", repository)
+        advanceUntilIdle()
+
+        viewModel.dismissDoomNotice()
+        advanceUntilIdle()
+
+        coVerify { repository.sendAction("game-1", "doom/ack", any()) }
+        coVerify { repository.sendAction("game-1", "nextTurn", any()) }
+    }
+
+    @Test
+    fun `dismissCardCommandNotice clears the active card command notice`() = runTest {
+        val localPlayerId = "player-1"
+        val quickPeek = Card(CardType.QuickPeek, id = "qp-1", name = "Quick Peek", effectId = "QUICK_PEEK")
+        val initialState = gameState(
+            currentPlayerId = localPlayerId,
+            localHand = listOf(quickPeek),
+            localHandSizeHint = 1
+        )
+        val resultEvent = JSONObject()
+            .put("type", "CARD_COMMAND_RESULT")
+            .put("commandId", "QUICK_PEEK")
+            .put("card", quickPeek.toJson())
+            .put("message", "Top card: Doom.")
+
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returns initialState
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns flowOf(resultEvent)
+
+        val viewModel = createViewModel("game-1", localPlayerId, "Local", repository)
+        advanceUntilIdle()
+
+        assertEquals("Quick Peek", viewModel.cardCommandNotice.value?.title)
+
+        viewModel.dismissCardCommandNotice()
+        advanceUntilIdle()
+
+        assertEquals(null, viewModel.cardCommandNotice.value)
+    }
+
+    @Test
+    fun `game over is emitted with the winner id when game transitions to Finished`() = runTest {
+        val localPlayerId = "player-1"
+        val initialState = gameState(currentPlayerId = localPlayerId, localHand = emptyList(), localHandSizeHint = 0)
+        val finishedState = GameState(
+            id = "game-1",
+            players = arrayListOf(
+                Player(id = localPlayerId, lives = 3, name = "Local"),
+                Player(id = "player-2", lives = 0, name = "Remote")
+            ),
+            currentPlayerIndex = 0,
+            status = Status.Finished,
+            currentPlayerId = localPlayerId
+        )
+
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returns initialState
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+
+        val viewModel = createViewModel("game-1", localPlayerId, "Local", repository)
+        // Start collecting BEFORE advanceUntilIdle so the collector is subscribed before any emit
+        val gameOverResults = mutableListOf<String>()
+        val collectJob = launch { viewModel.gameOver.collect { gameOverResults.add(it) } }
+        advanceUntilIdle()
+
+        gameStateFlow.emit(finishedState)
+        advanceUntilIdle()
+        collectJob.cancel()
+
+        assertEquals(listOf(localPlayerId), gameOverResults)
     }
 
     private fun createViewModel(

@@ -19,3 +19,14 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep stack trace line numbers in crash reports
+-keepattributes SourceFile,LineNumberTable
+
+# Krossbow (STOMP/WebSocket) — uses reflection for coroutine dispatch
+-keep class org.hildan.krossbow.** { *; }
+-dontwarn org.hildan.krossbow.**
+
+# ZXing QR scanner
+-keep class com.google.zxing.** { *; }
+-keep class com.journeyapps.barcodescanner.** { *; }

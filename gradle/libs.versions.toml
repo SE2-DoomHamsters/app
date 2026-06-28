@@ -25,6 +25,11 @@ ui = "1.10.6"
 
 lifecycleViewmodelCompose = "2.8.6"
 foundation = "1.11.1"
+sonarqube = "5.1.0.4882"
+dokka = "1.9.20"
+zxing = "4.3.0"
+robolectric = "4.16.1"
+orgJson = "20260522"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -61,9 +66,14 @@ androidx-compose-foundation = { group = "androidx.compose.foundation", name = "f
 androidx-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "ui" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version.ref = "coil" }
+zxing-android-embedded = { module = "com.journeyapps:zxing-android-embedded", version.ref = "zxing" }
+robolectric = { module = "org.robolectric:robolectric", version.ref = "robolectric" }
+org-json = { module = "org.json:json", version.ref = "orgJson" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+sonarqube = { id = "org.sonarqube", version.ref = "sonarqube" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }
 

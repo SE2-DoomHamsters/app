@@ -405,6 +405,7 @@ open class GameBoardViewModel(
                 _pendingDoomMessage.value = "Waiting for votes."
             }
             SnackStashUiEffect.ClearDoomSelection -> {
+                _pendingDoom.value = null
                 _pendingDoomRequiresSelection.value = false
                 _pendingDoomRequiresInsertionUi.value = false
                 _pendingDoomMessage.value = null

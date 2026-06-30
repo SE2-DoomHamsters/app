@@ -92,6 +92,8 @@ open class GameBoardViewModel(
     val cardPlayed: SharedFlow<Unit> = _cardPlayed
     private val _showTargetSelectionDialog = MutableStateFlow(false)
     val showTargetSelectionDialog: StateFlow<Boolean> = _showTargetSelectionDialog
+    private val _showBegForSnacksDialog = MutableStateFlow(false)
+    val showBegForSnacksDialog: StateFlow<Boolean> = _showBegForSnacksDialog
     private val _selectedCardForActivation = MutableStateFlow<Card?>(null)
     val selectedCardForActivation: StateFlow<Card?> = _selectedCardForActivation
     val mascot = MascotViewModelFeature(
@@ -700,6 +702,11 @@ open class GameBoardViewModel(
             )
             return
         }
+        if (command.requiresTargetPlayer && command.requiresCardType && !parameters.containsKey("targetPlayerId")) {
+            _selectedCardForActivation.value = card
+            _showBegForSnacksDialog.value = true
+            return
+        }
         if (card.type == CardType.StealCard && !parameters.containsKey("targetPlayerId")) {
             _selectedCardForActivation.value = card
             _showTargetSelectionDialog.value = true
@@ -751,6 +758,18 @@ open class GameBoardViewModel(
 
     fun dismissTargetSelection() {
         _showTargetSelectionDialog.value = false
+        _selectedCardForActivation.value = null
+    }
+
+    fun confirmBegForSnacks(targetPlayerId: String, requestedCardType: String) {
+        val card = _selectedCardForActivation.value ?: return
+        _showBegForSnacksDialog.value = false
+        _selectedCardForActivation.value = null
+        activateCardWithTargets(card, targetPlayerId, requestedCardType)
+    }
+
+    fun dismissBegForSnacksDialog() {
+        _showBegForSnacksDialog.value = false
         _selectedCardForActivation.value = null
     }
 

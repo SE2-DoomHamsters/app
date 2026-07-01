@@ -847,7 +847,7 @@ open class GameBoardViewModel(
         if (_isLocalPlayersTurn.value) {
             viewModelScope.launch {
                 try {
-                    Log.d(tag, "Sending doom ack gameId=$gameId playerId=$localPlayerId")
+                    Log.d(tag, "Sending doom ack gameId=$gameId playerId=$localPlayerId resolvingDoomPlayerId=${_gameState.value?.resolvingDoomPlayerId} currentTurnPlayerId=${_gameState.value?.currentTurnPlayerId}")
                     repository.sendAction(
                         gameId,
                         "doom/ack",

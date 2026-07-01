@@ -177,7 +177,7 @@ class SnackStashViewModelFeature(
             return
         }
 
-        logDebug("Sending doom ack gameId=$gameId playerId=$playerId")
+        logDebug("Sending doom ack gameId=$gameId playerId=$playerId resolvingDoomPlayerId=${state.resolvingDoomPlayerId} currentTurnPlayerId=${state.currentTurnPlayerId}")
         sendAction("doom/ack", JSONObject().put("playerId", playerId))
         clearPendingDoomUi()
         refreshGameState()

@@ -196,6 +196,12 @@ class SnackStashViewModelFeature(
                 gameState()?.pendingDoomRequiresInsertion == false
 
         if (!shouldAdvance) {
+            val doomWasDefused =
+                notice?.outcome == SnackStashResolutionOutcome.UNCHALLENGED ||
+                    notice?.outcome == SnackStashResolutionOutcome.LEGITIMATE_CALL
+            if (doomWasDefused) {
+                refreshGameState()
+            }
             return
         }
 

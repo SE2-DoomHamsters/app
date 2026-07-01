@@ -833,6 +833,9 @@ open class GameBoardViewModel(
         if (_pendingDoomRequiresSelection.value) {
             return
         }
+        if (_pendingDoomRequiresInsertionUi.value) {
+            return
+        }
 
         clearPendingDoomUi()
 

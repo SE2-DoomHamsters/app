@@ -210,6 +210,11 @@ open class GameBoardViewModel(
             _cardPlayed.tryEmit(Unit)
         }
 
+        if (parsedEvent.commandId == CardCommandId.CAGE_SWAP &&
+            parsedEvent.playerId != localPlayerId) {
+            viewModelScope.launch { broadcastLatestState() }
+        }
+
         val message = parsedEvent.message ?: buildString {
             append(parsedEvent.playerName ?: "A player")
             parsedEvent.commandId?.let { commandId ->
@@ -443,6 +448,7 @@ open class GameBoardViewModel(
                 _pendingDoomMessage.value = "Waiting for votes."
             }
             SnackStashUiEffect.ClearDoomSelection -> {
+                _pendingDoom.value = null
                 _pendingDoomRequiresSelection.value = false
                 _pendingDoomRequiresInsertionUi.value = false
                 _pendingDoomMessage.value = null
@@ -832,13 +838,16 @@ open class GameBoardViewModel(
         if (_pendingDoomRequiresSelection.value) {
             return
         }
+        if (_pendingDoomRequiresInsertionUi.value) {
+            return
+        }
 
         clearPendingDoomUi()
 
         if (_isLocalPlayersTurn.value) {
             viewModelScope.launch {
                 try {
-                    Log.d(tag, "Sending doom ack gameId=$gameId playerId=$localPlayerId")
+                    Log.d(tag, "Sending doom ack gameId=$gameId playerId=$localPlayerId resolvingDoomPlayerId=${_gameState.value?.resolvingDoomPlayerId} currentTurnPlayerId=${_gameState.value?.currentTurnPlayerId}")
                     repository.sendAction(
                         gameId,
                         "doom/ack",

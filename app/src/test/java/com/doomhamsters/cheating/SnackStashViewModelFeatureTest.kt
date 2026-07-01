@@ -170,7 +170,7 @@ class SnackStashViewModelFeatureTest {
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), fixture.sentActions.map { it.action })
-        assertEquals(0, fixture.refreshCount)
+        assertEquals(1, fixture.refreshCount)
         assertNull(fixture.feature.resolutionNotice.value)
     }
 

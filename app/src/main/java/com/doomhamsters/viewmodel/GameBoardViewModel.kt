@@ -210,6 +210,11 @@ open class GameBoardViewModel(
             _cardPlayed.tryEmit(Unit)
         }
 
+        if (parsedEvent.commandId == CardCommandId.CAGE_SWAP &&
+            parsedEvent.playerId != localPlayerId) {
+            viewModelScope.launch { broadcastLatestState() }
+        }
+
         val message = parsedEvent.message ?: buildString {
             append(parsedEvent.playerName ?: "A player")
             parsedEvent.commandId?.let { commandId ->

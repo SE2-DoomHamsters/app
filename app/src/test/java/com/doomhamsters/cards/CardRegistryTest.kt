@@ -69,6 +69,17 @@ class CardRegistryTest {
     }
 
     @Test
+    fun `beg for snacks is registered as target and card type command`() {
+        val definition = CardRegistry.definitionForType(CardType.BegForSnacks)
+
+        assertEquals("Beg for Snacks", definition.displayName)
+        assertEquals(CardCommandId.BEG_FOR_SNACKS, definition.command?.id)
+        assertTrue(definition.command?.requiresTargetPlayer == true)
+        assertTrue(definition.command?.requiresCardType == true)
+        assertFalse(definition.command?.endsTurn == true)
+    }
+
+    @Test
     fun `squick is registered as a no-target no-private command card`() {
         val definition = CardRegistry.definitionForType(CardType.Squick)
 

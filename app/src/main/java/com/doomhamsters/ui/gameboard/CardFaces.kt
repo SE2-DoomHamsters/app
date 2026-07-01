@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.doomhamsters.model.Card
@@ -53,8 +55,22 @@ fun CardFaceDown(modifier: Modifier = Modifier, shadowOffset: () -> Float = { 4f
 }
 
 /** Renders the visible front face for a specific card. */
+data class CardFaceStyle(
+    val width: Dp = 100.dp,
+    val height: Dp = 150.dp,
+    val labelFontSize: TextUnit = 16.sp
+)
+
+/** Renders the visible front face for a specific card. */
 @Composable
-fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: Modifier = Modifier, shadowOffset: () -> Float = { 4f }) {
+fun CardFaceUp(
+    card: Card,
+    isSelected: Boolean,
+    isDefocused: Boolean,
+    modifier: Modifier = Modifier,
+    style: CardFaceStyle = CardFaceStyle(),
+    shadowOffset: () -> Float = { 4f }
+) {
     val (bgColor, innerBorderColor, textColor) = when (card.type) {
         CardType.Doom -> Triple(DoomColor, Color(0xFFC94A4A), BackgroundCream)
         CardType.SnackStash -> Triple(SnackStashColor, Color(0xFFA3C968), CardDarkMaroon)
@@ -79,8 +95,8 @@ fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: 
 
     Box(
         modifier = modifier
-            .width(100.dp)
-            .height(150.dp)
+            .width(style.width)
+            .height(style.height)
     ) {
         Box(
             modifier = Modifier
@@ -105,7 +121,7 @@ fun CardFaceUp(card: Card, isSelected: Boolean, isDefocused: Boolean, modifier: 
                     text = card.displayName().replace(" ", "\n"),
                     color = textColor,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
+                    fontSize = style.labelFontSize,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.align(Alignment.Center)
                 )

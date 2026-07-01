@@ -719,7 +719,7 @@ open class GameBoardViewModel(
     fun canActivateCard(card: Card): Boolean = cardActivation.canActivate(card)
 
     /** Sends the activation request for a playable card. */
- 
+
 
     /** Called by the UI once the player has chosen a target and card type. */
     fun activateCardWithTargets(

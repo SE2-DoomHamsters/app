@@ -21,6 +21,7 @@ class StealCardDefinitionTest {
         assertEquals(CardCommandId.STEAL_CARD, command.id)
         assertEquals(true, command.privateResult)
         assertEquals(false, command.endsTurn)
+        assertEquals(true, command.requiresTargetPlayer)
         assertEquals("card/activate", command.actionPath)
     }
 

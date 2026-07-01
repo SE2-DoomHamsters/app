@@ -177,7 +177,7 @@ class SnackStashViewModelFeature(
             return
         }
 
-        logDebug("Sending doom ack gameId=$gameId playerId=$playerId")
+        logDebug("Sending doom ack gameId=$gameId playerId=$playerId resolvingDoomPlayerId=${state.resolvingDoomPlayerId} currentTurnPlayerId=${state.currentTurnPlayerId}")
         sendAction("doom/ack", JSONObject().put("playerId", playerId))
         clearPendingDoomUi()
         refreshGameState()
@@ -196,6 +196,12 @@ class SnackStashViewModelFeature(
                 gameState()?.pendingDoomRequiresInsertion == false
 
         if (!shouldAdvance) {
+            val doomWasDefused =
+                notice?.outcome == SnackStashResolutionOutcome.UNCHALLENGED ||
+                    notice?.outcome == SnackStashResolutionOutcome.LEGITIMATE_CALL
+            if (doomWasDefused) {
+                refreshGameState()
+            }
             return
         }
 

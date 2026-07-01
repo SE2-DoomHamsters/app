@@ -90,6 +90,102 @@ class GameBoardViewModelStateSyncTest {
     }
 
     @Test
+    fun `refreshes local hand when shared sync changes hidden hand size`() = runTest {
+        val localPlayerId = "player-1"
+        val initialState = gameState(
+            currentPlayerId = "player-2",
+            localHand = listOf(
+                Card(CardType.Normal, id = "n1"),
+                Card(CardType.SnackStash, id = "s1"),
+                Card(CardType.Normal, id = "n2")
+            ),
+            localHandSizeHint = 3
+        )
+        val broadcastState = gameState(
+            currentPlayerId = "player-2",
+            localHand = emptyList(),
+            localHandSizeHint = 2
+        )
+        val refreshedState = gameState(
+            currentPlayerId = "player-2",
+            localHand = listOf(
+                Card(CardType.Normal, id = "n1"),
+                Card(CardType.Normal, id = "n2")
+            ),
+            localHandSizeHint = 2
+        )
+
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } returnsMany
+            listOf(initialState, refreshedState)
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+
+        val viewModel = createViewModel(
+            gameId = "game-1",
+            initialLocalPlayerId = localPlayerId,
+            localPlayerName = "Local",
+            repository = repository
+        )
+        advanceUntilIdle()
+
+        gameStateFlow.emit(broadcastState)
+        advanceUntilIdle()
+
+        val localPlayer = viewModel.gameState.value!!.players.first { it.id == localPlayerId }
+        assertEquals(2, localPlayer.hand.size)
+        assertEquals(listOf("n1", "n2"), localPlayer.hand.map { it.id })
+        coVerify(exactly = 2) { repository.fetchGameState("game-1", localPlayerId) }
+    }
+
+    @Test
+    fun `keeps bounded local hand when hidden hand refresh fails`() = runTest {
+        val localPlayerId = "player-1"
+        val initialState = gameState(
+            currentPlayerId = "player-2",
+            localHand = listOf(
+                Card(CardType.Normal, id = "n1"),
+                Card(CardType.SnackStash, id = "s1"),
+                Card(CardType.Normal, id = "n2")
+            ),
+            localHandSizeHint = 3
+        )
+        val broadcastState = gameState(
+            currentPlayerId = "player-2",
+            localHand = emptyList(),
+            localHandSizeHint = 2
+        )
+        var fetchCount = 0
+
+        coEvery { repository.connect() } just Runs
+        coEvery { repository.fetchGameState("game-1", localPlayerId) } coAnswers {
+            if (fetchCount++ == 0) {
+                initialState
+            } else {
+                throw IllegalStateException("refresh failed")
+            }
+        }
+        coEvery { repository.subscribeToGameState("game-1") } returns gameStateFlow
+        coEvery { repository.subscribeToPrivateEvents("game-1", localPlayerId) } returns emptyFlow()
+
+        val viewModel = createViewModel(
+            gameId = "game-1",
+            initialLocalPlayerId = localPlayerId,
+            localPlayerName = "Local",
+            repository = repository
+        )
+        advanceUntilIdle()
+
+        gameStateFlow.emit(broadcastState)
+        advanceUntilIdle()
+
+        val localPlayer = viewModel.gameState.value!!.players.first { it.id == localPlayerId }
+        assertEquals(2, localPlayer.hand.size)
+        assertEquals(listOf("n1", "s1"), localPlayer.hand.map { it.id })
+        coVerify(exactly = 2) { repository.fetchGameState("game-1", localPlayerId) }
+    }
+
+    @Test
     fun `doom draw prompts local player to claim a selected card as snack stash`() = runTest {
         val localPlayerId = "player-1"
         val privateEventFlow = MutableSharedFlow<JSONObject>()

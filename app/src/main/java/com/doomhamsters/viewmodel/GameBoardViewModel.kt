@@ -11,6 +11,7 @@ import com.doomhamsters.cards.CardCommandId
 import com.doomhamsters.cards.CardCommandNotice
 import com.doomhamsters.cards.CardCommandRequest
 import com.doomhamsters.cards.displayName
+import com.doomhamsters.cards.presentation.CardCommandSelectionPresentation
 import com.doomhamsters.model.Card
 import com.doomhamsters.model.CardType
 import com.doomhamsters.model.GameState
@@ -150,6 +151,7 @@ open class GameBoardViewModel(
     private var awaitingLocalDrawOutcome = false
     private var doomOutcomeLogged = false
     private var pendingPrivateDoomCard: Card? = null
+    private var refreshingHiddenLocalHand = false
 
     init {
         connectAndObserveRemoteState()
@@ -166,11 +168,6 @@ open class GameBoardViewModel(
         isLocalPlayersTurn = { _isLocalPlayersTurn.value },
         onStateChanged = { broadcastLatestState() }
     )
-
-
-
-    private val _pendingTargetedCard = MutableStateFlow<Card?>(null)
-    val pendingTargetedCard: StateFlow<Card?> = _pendingTargetedCard
 
     private fun connectAndObserveRemoteState() {
         viewModelScope.launch {
@@ -340,6 +337,8 @@ open class GameBoardViewModel(
             }
         }
 
+        val shouldRefreshHiddenLocalHand =
+            needsHiddenLocalHandRefresh(previousState, snapshot)
         val mergedSnapshot = preserveLocalHand(snapshot)
         _gameState.value = mergedSnapshot
         _isLocalPlayersTurn.value = mergedSnapshot.currentTurnPlayerId == localPlayerId
@@ -351,6 +350,9 @@ open class GameBoardViewModel(
             "Applied state gameId=$gameId localPlayerId=$localPlayerId currentPlayerId=${mergedSnapshot.currentTurnPlayerId} turnCount=${mergedSnapshot.turnCount} isLocalPlayersTurn=${_isLocalPlayersTurn.value} pendingDoom=${_pendingDoom.value != null}"
         )
         checkGameOver(mergedSnapshot)
+        if (shouldRefreshHiddenLocalHand) {
+            refreshHiddenLocalHand()
+        }
     }
 
     private fun preserveLocalHand(snapshot: GameState): GameState {
@@ -365,9 +367,9 @@ open class GameBoardViewModel(
         if (
             incomingLocalPlayer.hand.isEmpty() &&
             previousLocalPlayer.hand.isNotEmpty() &&
-            incomingHandSize == previousLocalPlayer.hand.size
+            incomingHandSize > 0
         ) {
-            incomingLocalPlayer.hand.addAll(previousLocalPlayer.hand)
+            incomingLocalPlayer.hand.addAll(previousLocalPlayer.hand.take(incomingHandSize))
         }
 
         if (
@@ -382,6 +384,42 @@ open class GameBoardViewModel(
         }
 
         return snapshot
+    }
+
+    private fun needsHiddenLocalHandRefresh(
+        previousState: GameState?,
+        snapshot: GameState
+    ): Boolean {
+        val previousLocalPlayer =
+            previousState?.players?.firstOrNull { it.id == localPlayerId } ?: return false
+        val incomingLocalPlayer =
+            snapshot.players.firstOrNull { it.id == localPlayerId } ?: return false
+        val incomingHandSize = incomingLocalPlayer.visibleHandSize()
+
+        return incomingLocalPlayer.hand.isEmpty() &&
+            incomingHandSize > 0 &&
+            incomingHandSize != previousLocalPlayer.hand.size
+    }
+
+    private fun refreshHiddenLocalHand() {
+        if (refreshingHiddenLocalHand) return
+        refreshingHiddenLocalHand = true
+        viewModelScope.launch {
+            try {
+                Log.d(tag, "Refreshing hidden local hand gameId=$gameId localPlayerId=$localPlayerId")
+                broadcastLatestState()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w(
+                    tag,
+                    "Hidden local hand refresh failed gameId=$gameId localPlayerId=$localPlayerId",
+                    e
+                )
+            } finally {
+                refreshingHiddenLocalHand = false
+            }
+        }
     }
 
     private fun launchSnackStashAction(userErrorMessage: String, action: suspend () -> Unit) {
@@ -683,6 +721,9 @@ open class GameBoardViewModel(
     /** Returns whether the local player can activate the supplied card right now. */
     fun canActivateCard(card: Card): Boolean = cardActivation.canActivate(card)
 
+    /** Sends the activation request for a playable card. */
+
+
     /** Called by the UI once the player has chosen a target and card type. */
     fun activateCardWithTargets(
         card: Card,
@@ -700,7 +741,7 @@ open class GameBoardViewModel(
             )
             return
         }
-        if (card.type == CardType.StealCard && !parameters.containsKey("targetPlayerId")) {
+        if (missingRequiredActivationParameters(card, parameters)) {
             _selectedCardForActivation.value = card
             _showTargetSelectionDialog.value = true
             return
@@ -742,11 +783,44 @@ open class GameBoardViewModel(
         }
     }
 
-    fun selectStealTarget(targetPlayerId: String) {
+    private fun missingRequiredActivationParameters(
+        card: Card,
+        parameters: Map<String, Any>
+    ): Boolean {
+        val command = CardRegistry.commandFor(card) ?: return false
+        val missingTargetPlayer =
+            command.requiresTargetPlayer && !parameters.containsKey("targetPlayerId")
+        val missingRequestedCardType =
+            command.requiresCardType && !parameters.containsKey("cardType")
+        val missingHamsterType =
+            command.requiresHamsterType && !parameters.containsKey("hamsterType")
+
+        return missingTargetPlayer || missingRequestedCardType || missingHamsterType
+    }
+
+    fun confirmCardCommandSelection(
+        targetPlayerId: String?,
+        requestedCardType: String?,
+        hamsterType: String?
+    ) {
         val card = _selectedCardForActivation.value ?: return
         _showTargetSelectionDialog.value = false
-        activateCard(card, mapOf("targetPlayerId" to targetPlayerId))
         _selectedCardForActivation.value = null
+
+        val parameters = CardCommandSelectionPresentation.activationParameters(
+            targetPlayerId = targetPlayerId,
+            requestedCardType = requestedCardType,
+            hamsterType = hamsterType
+        )
+        activateCard(card, parameters)
+    }
+
+    fun selectStealTarget(targetPlayerId: String) {
+        confirmCardCommandSelection(
+            targetPlayerId = targetPlayerId,
+            requestedCardType = null,
+            hamsterType = null
+        )
     }
 
     fun dismissTargetSelection() {

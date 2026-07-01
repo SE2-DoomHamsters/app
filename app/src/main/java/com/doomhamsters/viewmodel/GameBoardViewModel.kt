@@ -174,21 +174,23 @@ open class GameBoardViewModel(
             connectionManager.connectAndMaintain(
                 localPlayerId = localPlayerId,
                 localPlayerName = localPlayerName,
-                onInitialConnect = { refreshGameState(resolvePlayerId = true) },
-                onReconnect = { refreshGameState(resolvePlayerId = false) },
-                onGameStateReceived = { state ->
-                    runCatching { applyGameState(state, resolvePlayerId = false) }
-                        .onFailure { e -> Log.e(tag, "State apply error gameId=$gameId", e) }
-                },
-                onPublicEventReceived = { event ->
-                    runCatching { handlePublicGameEvent(event) }
-                },
-                onPrivateEventReceived = { event ->
-                    runCatching { handlePrivateEvent(event) }
-                },
-                onFatalError = { errorMsg -> _error.emit(errorMsg) },
-                onServerError = { message -> handleServerError(message) },
-                onLog = { msg -> addLog(msg) }
+                callbacks = GameConnectionCallbacks(
+                    onInitialConnect = { refreshGameState(resolvePlayerId = true) },
+                    onReconnect = { refreshGameState(resolvePlayerId = false) },
+                    onGameStateReceived = { state ->
+                        runCatching { applyGameState(state, resolvePlayerId = false) }
+                            .onFailure { e -> Log.e(tag, "State apply error gameId=$gameId", e) }
+                    },
+                    onPublicEventReceived = { event ->
+                        runCatching { handlePublicGameEvent(event) }
+                    },
+                    onPrivateEventReceived = { event ->
+                        runCatching { handlePrivateEvent(event) }
+                    },
+                    onFatalError = { errorMsg -> _error.emit(errorMsg) },
+                    onServerError = { message -> handleServerError(message) },
+                    onLog = { msg -> addLog(msg) }
+                )
             )
         }
     }
@@ -763,10 +765,7 @@ open class GameBoardViewModel(
                         if (parameters.isNotEmpty()) {
                             val paramsJson = JSONObject()
                             parameters.forEach { (key, value) -> paramsJson.put(key, value) }
-                            put(
-                                "parameters",
-                                paramsJson
-                            ) // 'put' packt es direkt in das fertige toJson()
+                            put("parameters", paramsJson)
                         }
                     })
                 broadcastLatestState()
@@ -823,7 +822,6 @@ open class GameBoardViewModel(
         )
     }
 
-    /** Wird aufgerufen, wenn der Spieler den Auswahldialog abbricht */
     fun dismissTargetSelection() {
         _showTargetSelectionDialog.value = false
         _selectedCardForActivation.value = null

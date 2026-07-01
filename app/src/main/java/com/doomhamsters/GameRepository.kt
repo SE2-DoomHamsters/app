@@ -3,8 +3,11 @@ package com.doomhamsters
 
 import android.util.Log
 import com.doomhamsters.model.GameState
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
@@ -28,7 +31,8 @@ class GameRepository(
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .build()
         )
-    )
+    ),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
     private val tag = "GameRepository"
     internal var session: StompSession? = null
@@ -49,41 +53,50 @@ class GameRepository(
     }
 
     /** Subscribes to the public game event channel. */
-    suspend fun subscribeToGame(gameId: String): Flow<String> =
-        requireSession()
-            .subscribeText("/topic/game/$gameId")
+    fun subscribeToGame(gameId: String): Flow<String> = flow {
+        emitAll(requireSession().subscribeText("/topic/game/$gameId"))
+    }
 
     /** Subscribes to realtime game state snapshots for a game. */
-    suspend fun subscribeToGameState(gameId: String): Flow<GameState> =
-        requireSession()
-            .subscribeText("/topic/game-state/$gameId")
-            .mapNotNull { payload ->
-                Log.d(tag, "WS game-state raw gameId=$gameId payload=$payload")
-                parseGameStateOrNull(payload)?.also { state ->
-                    Log.d(
-                        tag,
-                        "WS game-state parsed gameId=$gameId currentPlayerId=${state.currentTurnPlayerId} turnCount=${state.turnCount} status=${state.status}"
-                    )
+    fun subscribeToGameState(gameId: String): Flow<GameState> = flow {
+        emitAll(
+            requireSession()
+                .subscribeText("/topic/game-state/$gameId")
+                .mapNotNull { payload ->
+                    Log.d(tag, "WS game-state raw gameId=$gameId payload=$payload")
+                    parseGameStateOrNull(payload)?.also { state ->
+                        Log.d(
+                            tag,
+                            "WS game-state parsed gameId=$gameId currentPlayerId=${state.currentTurnPlayerId} turnCount=${state.turnCount} status=${state.status}"
+                        )
+                    }
                 }
-            }
+        )
+    }
 
     /** Subscribes to player-specific private game events. */
-    suspend fun subscribeToPrivateEvents(gameId: String, playerId: String): Flow<JSONObject> =
-        requireSession()
-            .subscribeText("/queue/game/$gameId/$playerId")
-            .mapNotNull { payload ->
-                Log.d(tag, "WS private-event gameId=$gameId playerId=$playerId payload=$payload")
-                parsePrivateEventOrNull(payload)
-            }
+    fun subscribeToPrivateEvents(gameId: String, playerId: String): Flow<JSONObject> = flow {
+        emitAll(
+            requireSession()
+                .subscribeText("/queue/game/$gameId/$playerId")
+                .mapNotNull { payload ->
+                    Log.d(tag, "WS private-event gameId=$gameId playerId=$playerId payload=$payload")
+                    parsePrivateEventOrNull(payload)
+                }
+        )
+    }
 
     /** Subscribes to player-specific error events for rejected or failed actions. */
-    suspend fun subscribeToErrors(gameId: String, playerId: String): Flow<String> =
-        requireSession()
-            .subscribeText("/queue/game/$gameId/$playerId/errors")
-            .mapNotNull { payload ->
-                Log.d(tag, "WS error-event gameId=$gameId playerId=$playerId payload=$payload")
-                parseErrorMessageOrNull(payload)
-            }
+    fun subscribeToErrors(gameId: String, playerId: String): Flow<String> = flow {
+        emitAll(
+            requireSession()
+                .subscribeText("/queue/game/$gameId/$playerId/errors")
+                .mapNotNull { payload ->
+                    Log.d(tag, "WS error-event gameId=$gameId playerId=$playerId payload=$payload")
+                    parseErrorMessageOrNull(payload)
+                }
+        )
+    }
 
     /** Parses a game-state payload, logging and dropping it (returns null) when malformed. */
     internal fun parseGameStateOrNull(payload: String): GameState? =
@@ -111,7 +124,7 @@ class GameRepository(
             .get()
             .build()
 
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             httpClient.newCall(request).execute().use { response ->
                 check(response.isSuccessful) { "Game state fetch failed: ${response.code}" }
                 val body = response.body!!.string()
@@ -142,7 +155,7 @@ class GameRepository(
             .get()
             .build()
 
-        return withContext(Dispatchers.IO) {
+        return withContext(ioDispatcher) {
             httpClient.newCall(request).execute().use { response ->
                 if (response.code == 404) return@withContext null
                 check(response.isSuccessful) { "Game state fetch failed: ${response.code}" }

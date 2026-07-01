@@ -8,6 +8,7 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkStatic
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.test.runTest
 import okhttp3.Call
 import okhttp3.MediaType.Companion.toMediaType
@@ -202,8 +203,39 @@ class LobbyRepositoryTest {
     @Test
     fun `subscribeLobbyUpdates throws when not connected`() = runTest {
         assertThrows<IllegalStateException> {
-            repository.subscribeLobbyUpdates("TEST")
+            repository.subscribeLobbyUpdates("TEST").collect()
         }
+    }
+
+    @Test
+    fun `leaveLobby sends post request to correct url`() = runTest {
+        stubHttpResponse(200, "")
+
+        repository.leaveLobby("TEST_LOBBY", "u1")
+
+        coVerify {
+            mockHttpClient.newCall(match { request ->
+                request.url.toString().contains("/api/lobby/TEST_LOBBY/leave") &&
+                    request.method == "POST"
+            })
+        }
+    }
+
+    @Test
+    fun `leaveLobby handles server error gracefully without throwing`() = runTest {
+        stubHttpResponse(500, "")
+
+        repository.leaveLobby("TEST_LOBBY", "u1")
+        // Should complete without throwing
+    }
+
+    @Test
+    fun `getLobby returns null for non-200 response`() = runTest {
+        stubHttpResponse(404, "")
+
+        val result = repository.getLobby("MISSING")
+
+        assertNull(result)
     }
 
     private fun stubHttpResponse(code: Int, body: String) {

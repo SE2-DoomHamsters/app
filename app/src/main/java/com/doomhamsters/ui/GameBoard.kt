@@ -9,8 +9,6 @@ import com.doomhamsters.ui.mascot.BoardMascot
 import com.doomhamsters.ui.theme.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
@@ -38,7 +36,6 @@ fun GameBoard(
     onLeaveGame: () -> Unit = {}
 ) {
     val showTargetSelectionDialog by viewModel.showTargetSelectionDialog.collectAsState()
-    val showBegForSnacksDialog by viewModel.showBegForSnacksDialog.collectAsState()
     val mascotAnimation by viewModel.mascot.animation.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val gameState = uiState.gameState
@@ -344,17 +341,6 @@ fun GameBoard(
                     )
                 }
 
-                if (showBegForSnacksDialog) {
-                    BegForSnacksDialog(
-                        opponents = state.players.filter { it.id != viewModel.localPlayerId },
-                        playerNames = playerNames,
-                        onConfirm = { targetPlayerId, cardType ->
-                            viewModel.confirmBegForSnacks(targetPlayerId, cardType)
-                        },
-                        onDismiss = { viewModel.dismissBegForSnacksDialog() }
-                    )
-                }
-
                 SnackStashClaimDialogHost(
                     state = snackStashClaimDialogState,
                     onClaimCard = viewModel.snackStash::claim,
@@ -389,70 +375,6 @@ fun GameBoard(
     }
 }
 
-
-@Composable
-private fun BegForSnacksDialog(
-    opponents: List<com.doomhamsters.model.Player>,
-    playerNames: Map<String, String>,
-    onConfirm: (targetPlayerId: String, cardType: String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var selectedOpponentId by remember { mutableStateOf<String?>(null) }
-    var selectedCardType by remember { mutableStateOf<com.doomhamsters.model.CardType?>(null) }
-    val requestableTypes = com.doomhamsters.model.CardType.entries.filter {
-        it != com.doomhamsters.model.CardType.Doom && it != com.doomhamsters.model.CardType.Normal
-    }
-    val scrollState = androidx.compose.foundation.rememberScrollState()
-
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { androidx.compose.material3.Text("Beg for Snacks", fontWeight = FontWeight.Bold) },
-        text = {
-            Column(modifier = Modifier.verticalScroll(scrollState)) {
-                androidx.compose.material3.Text("Who to beg from?")
-                Spacer(modifier = Modifier.height(4.dp))
-                opponents.forEach { opponent ->
-                    val name = resolvePlayerDisplayName(opponent.id, opponent.name, playerNames)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.material3.RadioButton(
-                            selected = selectedOpponentId == opponent.id,
-                            onClick = { selectedOpponentId = opponent.id }
-                        )
-                        androidx.compose.material3.Text(name)
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-                androidx.compose.material3.Text("Which card type?")
-                Spacer(modifier = Modifier.height(4.dp))
-                requestableTypes.forEach { cardType ->
-                    val displayName = com.doomhamsters.cards.CardRegistry.definitionForType(cardType).displayName
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        androidx.compose.material3.RadioButton(
-                            selected = selectedCardType == cardType,
-                            onClick = { selectedCardType = cardType }
-                        )
-                        androidx.compose.material3.Text(displayName)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.Button(
-                onClick = {
-                    val target = selectedOpponentId
-                    val type = selectedCardType
-                    if (target != null && type != null) onConfirm(target, type.name)
-                },
-                enabled = selectedOpponentId != null && selectedCardType != null
-            ) { androidx.compose.material3.Text("Confirm") }
-        },
-        dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                androidx.compose.material3.Text("Cancel")
-            }
-        }
-    )
-}
 
 @Composable
 private fun BoxScope.DecorativeSideBorders() {

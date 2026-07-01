@@ -16,6 +16,7 @@ import com.doomhamsters.model.CardType
             id = CardCommandId.STEAL_CARD,
             privateResult = true,
             endsTurn = false,
+            requiresTargetPlayer = true,
             actionPath = "card/activate",
             executor = StealCardCommand
         )

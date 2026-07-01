@@ -52,6 +52,7 @@ import com.doomhamsters.ui.theme.AccentOrange
 import com.doomhamsters.ui.theme.BackgroundCream
 import com.doomhamsters.ui.theme.CardDarkMaroon
 import com.doomhamsters.ui.theme.OutlineDark
+import com.doomhamsters.ui.gameboard.CardFaceStyle
 
 @Composable
 fun CardCommandSelectionOverlay(
@@ -435,9 +436,11 @@ private fun CardTypeWheel(
                         card = selectedOption.toPreviewCard(),
                         isSelected = true,
                         isDefocused = false,
-                        cardWidth = 72.dp,
-                        cardHeight = 108.dp,
-                        labelFontSize = 10.sp
+                        style = CardFaceStyle(
+                            width = 72.dp,
+                            height = 108.dp,
+                            labelFontSize = 10.sp
+                        )
                     )
                 }
 

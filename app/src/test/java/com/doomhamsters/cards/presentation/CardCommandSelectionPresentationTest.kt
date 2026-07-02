@@ -87,6 +87,78 @@ class CardCommandSelectionPresentationTest {
         )
 
         assertEquals(mapOf("targetPlayerId" to "p2"), parameters)
+    }@Test
+    fun `display returns null when card is null or has no command`() {
+        assertNull(
+            CardCommandSelectionPresentation.display(null, gameState(), "p1", null, null, "")
+        )
+        val normalCard = Card(CardType.Normal, id = "normal-1")
+        assertNull(
+            CardCommandSelectionPresentation.display(normalCard, gameState(), "p1", null, null, "")
+        )
+    }
+
+    @Test
+    fun `canConfirm handles cards that require target but nothing else`() {
+        val card = Card(CardType.StealCard, id = "steal-1")
+        var state = CardCommandSelectionPresentation.display(
+            card, gameState(), "p1", selectedTargetPlayerId = null, selectedCardType = null, hamsterType = ""
+        )
+        assertFalse(requireNotNull(state).canConfirm)
+
+        state = CardCommandSelectionPresentation.display(
+            card, gameState(), "p1", selectedTargetPlayerId = "p2", selectedCardType = null, hamsterType = ""
+        )
+        assertTrue(requireNotNull(state).canConfirm)
+    }
+
+    @Test
+    fun `canConfirm handles cards that require target and hamster type`() {
+        val card = Card(CardType.FourHamsters, id = "four-1")
+        var state = CardCommandSelectionPresentation.display(
+            card, gameState(), "p1", selectedTargetPlayerId = "p2", selectedCardType = null, hamsterType = ""
+        )
+        assertFalse(requireNotNull(state).canConfirm)
+        state = CardCommandSelectionPresentation.display(
+            card, gameState(), "p1", selectedTargetPlayerId = "p2", selectedCardType = null, hamsterType = "Sniper"
+        )
+        assertTrue(requireNotNull(state).canConfirm)
+    }
+
+    @Test
+    fun `canConfirm handles cards that require nothing`() {
+        val card = Card(CardType.QuickPeek, id = "peek-1")
+
+        val state = CardCommandSelectionPresentation.display(
+            card, gameState(), "p1", selectedTargetPlayerId = null, selectedCardType = null, hamsterType = ""
+        )
+        assertTrue(requireNotNull(state).canConfirm)
+    }
+
+    @Test
+    fun `initialRequestedCardType handles nulls gracefully`() {
+        assertNull(CardCommandSelectionPresentation.initialRequestedCardType(null))
+        assertNull(CardCommandSelectionPresentation.initialRequestedCardType(Card(CardType.Normal, id = "n-1")))
+    }
+
+    @Test
+    fun `activation parameters includes provided values correctly`() {
+        val parameters = CardCommandSelectionPresentation.activationParameters(
+            targetPlayerId = "p2",
+            requestedCardType = "PowerNap",
+            hamsterType = "Sniper"
+        )
+
+        assertEquals("p2", parameters["targetPlayerId"])
+        assertEquals("PowerNap", parameters["cardType"])
+        assertEquals("Sniper", parameters["hamsterType"])
+    }
+
+    @Test
+    fun `requestable card type options use name as fallback wire value`() {
+        val options = CardCommandSelectionPresentation.requestableCardTypeOptions()
+        val powerNapOption = options.first { it.type == CardType.PowerNap }
+        assertEquals("PowerNap", powerNapOption.wireValue)
     }
 
     private fun gameState(): GameState {
